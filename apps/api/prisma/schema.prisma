@@ -1,0 +1,188 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum WorkflowType {
+  EXPENSE_CLAIM
+  PETTY_CASH_REIMBURSEMENT
+  VENDOR_INVOICE_APPROVAL
+  INTERNAL_PAYMENT_REQUEST
+}
+
+enum CaseStatus {
+  DRAFT
+  SUBMITTED
+  INTAKE_PROCESSING
+  AWAITING_REQUESTER_INFO
+  POLICY_REVIEW
+  AWAITING_APPROVAL
+  AWAITING_APPROVER_INFO_RESPONSE
+  FINANCE_REVIEW
+  APPROVED
+  REJECTED
+  EXPORT_READY
+  EXPORTING
+  EXPORTED
+  RECOVERABLE_EXCEPTION
+  CLOSED
+}
+
+enum ActorType {
+  SYSTEM
+  REQUESTER
+  APPROVER
+  FINANCE_REVIEWER
+  ADMIN
+}
+
+enum ArtifactType {
+  RECEIPT
+  INVOICE
+  SCREENSHOT
+  NOTE
+  OTHER
+}
+
+model Case {
+  id                  String               @id @default(uuid())
+  workflowType        WorkflowType
+  status              CaseStatus           @default(DRAFT)
+  requesterId         String
+  submittedNotes      String?
+  assignedTo          String?
+  priority            String               @default("MEDIUM")
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  artifacts           Artifact[]
+  extractionResults   ExtractionResult[]
+  openQuestions       OpenQuestion[]
+  policyResults       PolicyResult[]
+  approvalTasks       ApprovalTask[]
+  financeReviews      FinanceReview[]
+  exportRecords       ExportRecord[]
+  workflowTransitions WorkflowTransition[]
+  auditEvents         AuditEvent[]
+}
+
+model Artifact {
+  id               String       @id @default(uuid())
+  caseId           String
+  type             ArtifactType @default(OTHER)
+  filename         String
+  mimeType         String?
+  storageUri       String?
+  extractedText    String?
+  processingStatus String       @default("PREPARED")
+  errorMessage     String?
+  uploadedAt       DateTime?
+  processingStartedAt DateTime?
+  processingCompletedAt DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  case             Case         @relation(fields: [caseId], references: [id], onDelete: Cascade)
+}
+
+model WorkflowTransition {
+  id         String     @id @default(uuid())
+  caseId     String
+  fromStatus CaseStatus
+  toStatus   CaseStatus
+  actorType  ActorType
+  actorId    String?
+  note       String?
+  createdAt  DateTime   @default(now())
+  case       Case       @relation(fields: [caseId], references: [id], onDelete: Cascade)
+}
+
+model AuditEvent {
+  id        String    @id @default(uuid())
+  caseId    String
+  eventType String
+  actorType ActorType
+  actorId   String?
+  payload   Json
+  createdAt DateTime  @default(now())
+  case      Case      @relation(fields: [caseId], references: [id], onDelete: Cascade)
+}
+
+model ExtractionResult {
+  id          String   @id @default(uuid())
+  caseId       String
+  fieldsJson   Json
+  confidence   Float
+  provenance   Json
+  createdAt    DateTime @default(now())
+  case         Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+}
+
+model OpenQuestion {
+  id          String   @id @default(uuid())
+  caseId       String
+  question     String
+  answer       String?
+  status       String   @default("OPEN")
+  source       String   @default("AI_INTAKE")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  case         Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+}
+
+model PolicyResult {
+  id                  String   @id @default(uuid())
+  caseId              String
+  passed              Boolean
+  warnings            Json
+  blockingIssues      Json
+  requiresFinanceReview Boolean @default(false)
+  duplicateSignals    Json
+  createdAt           DateTime @default(now())
+  case                Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+}
+
+model ApprovalTask {
+  id            String   @id @default(uuid())
+  caseId         String
+  approverId     String
+  status         String   @default("PENDING")
+  decision       String?
+  decisionReason String?
+  dueAt          DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  case           Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+}
+
+model FinanceReview {
+  id          String   @id @default(uuid())
+  caseId       String
+  reviewerId   String?
+  outcome      String?
+  note         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  case         Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+}
+
+model ExportRecord {
+  id            String   @id @default(uuid())
+  caseId         String
+  status         String   @default("READY")
+  payload        Json
+  connectorName  String   @default("mock-accounting-export")
+  errorMessage   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  case           Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+}
+
+model AdminSetting {
+  key       String   @id
+  value     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

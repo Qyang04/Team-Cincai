@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Master Plan | SME Finance Ops Copilot</title>
+  <style>
+    :root {
+      --bg: #f3ede2;
+      --surface: #fffaf1;
+      --surface-strong: #ffffff;
+      --ink: #161513;
+      --muted: #645e54;
+      --line: rgba(22, 21, 19, 0.12);
+      --accent: #0f766e;
+      --accent-soft: rgba(15, 118, 110, 0.12);
+      --accent-2: #b45309;
+      --accent-2-soft: rgba(180, 83, 9, 0.12);
+      --accent-3: #7c3aed;
+      --accent-3-soft: rgba(124, 58, 237, 0.12);
+      --danger: #b91c1c;
+      --shadow: 0 24px 70px rgba(38, 27, 10, 0.08);
+      --max: 1260px;
+      --radius: 30px;
+      --radius-sm: 18px;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Inter", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(15, 118, 110, 0.08), transparent 28%),
+        radial-gradient(circle at top right, rgba(124, 58, 237, 0.08), transparent 24%),
+        linear-gradient(180deg, #f5efe4 0%, #f1ebdf 54%, #ece5d7 100%);
+    }
+
+    .page {
+      width: min(calc(100% - 40px), var(--max));
+      margin: 0 auto;
+      padding: 24px 0 64px;
+    }
+
+    .hero {
+      min-height: 92vh;
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 24px;
+      padding-bottom: 10px;
+    }
+
+    .panel {
+      background: rgba(255, 250, 241, 0.8);
+      border: 1px solid rgba(22, 21, 19, 0.08);
+      border-radius: 36px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      backdrop-filter: blur(10px);
+    }
+
+    .hero-copy {
+      padding: 40px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .hero-visual {
+      padding: 24px;
+      background:
+        radial-gradient(circle at top, rgba(15, 118, 110, 0.14), transparent 30%),
+        linear-gradient(180deg, #111a1f 0%, #162126 100%);
+      color: #f4f5f6;
+    }
+
+    .eyebrow {
+      font-size: 12px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--muted);
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 36px;
+      height: 1px;
+      background: currentColor;
+      opacity: 0.7;
+    }
+
+    h1 {
+      margin: 18px 0;
+      font-size: clamp(46px, 7vw, 88px);
+      line-height: 0.95;
+      letter-spacing: -0.055em;
+      max-width: 10ch;
+    }
+
+    .hero-copy p {
+      max-width: 60ch;
+      line-height: 1.7;
+      color: var(--muted);
+      font-size: 18px;
+      margin: 0 0 22px;
+    }
+
+    .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 28px;
+    }
+
+    .chip {
+      border-radius: 999px;
+      padding: 10px 14px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.88);
+      font-size: 14px;
+    }
+
+    .chip.primary {
+      background: var(--accent);
+      color: white;
+      border-color: transparent;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .metric {
+      border-top: 1px solid var(--line);
+      padding: 16px 0 0;
+    }
+
+    .metric strong {
+      display: block;
+      font-size: 30px;
+      margin-bottom: 6px;
+    }
+
+    .metric span {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .dark-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      color: rgba(255,255,255,0.76);
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 18px;
+    }
+
+    .runtime-card {
+      border: 1px solid rgba(255,255,255,0.11);
+      border-radius: 28px;
+      background: rgba(255,255,255,0.04);
+      padding: 20px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .runtime-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .runtime-box {
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
+      background: rgba(255,255,255,0.05);
+      padding: 12px;
+      font-size: 13px;
+      line-height: 1.5;
+      color: rgba(255,255,255,0.78);
+    }
+
+    .runtime-box strong {
+      display: block;
+      color: white;
+      margin-bottom: 4px;
+      font-size: 14px;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .legend span {
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+      font-size: 13px;
+      color: rgba(255,255,255,0.72);
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      display: inline-block;
+    }
+
+    section {
+      margin-top: 26px;
+    }
+
+    .section {
+      padding: 32px;
+    }
+
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      align-items: end;
+      margin-bottom: 22px;
+    }
+
+    .section-head p {
+      max-width: 60ch;
+      line-height: 1.7;
+      color: var(--muted);
+      margin: 0;
+    }
+
+    h2 {
+      margin: 10px 0 0;
+      font-size: clamp(30px, 4vw, 50px);
+      line-height: 1.02;
+      letter-spacing: -0.04em;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 18px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .sub {
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 20px;
+      background: rgba(255,255,255,0.62);
+    }
+
+    .sub h3 {
+      margin: 0 0 12px;
+      font-size: 22px;
+      letter-spacing: -0.03em;
+    }
+
+    .sub p,
+    .sub li {
+      color: var(--muted);
+      line-height: 1.65;
+    }
+
+    .list {
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    .arch-stack {
+      display: grid;
+      gap: 14px;
+    }
+
+    .arch-row {
+      display: grid;
+      gap: 14px;
+    }
+
+    .arch-row.two { grid-template-columns: 1fr 1fr; }
+    .arch-row.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+    .arch-box {
+      border-radius: 24px;
+      padding: 20px;
+      border: 1px solid var(--line);
+      background: white;
+    }
+
+    .arch-box .label {
+      display: inline-block;
+      font-size: 12px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    .arch-box h3 {
+      margin: 0 0 10px;
+      font-size: 24px;
+    }
+
+    .arch-box p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.65;
+    }
+
+    .teal { background: linear-gradient(180deg, rgba(15,118,110,0.08), rgba(255,255,255,0.98)); }
+    .amber { background: linear-gradient(180deg, rgba(180,83,9,0.08), rgba(255,255,255,0.98)); }
+    .violet { background: linear-gradient(180deg, rgba(124,58,237,0.08), rgba(255,255,255,0.98)); }
+
+    .flow {
+      display: grid;
+      gap: 12px;
+    }
+
+    .flow-step {
+      display: grid;
+      grid-template-columns: 70px 1fr 180px;
+      gap: 14px;
+      align-items: center;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: rgba(255,255,255,0.78);
+    }
+
+    .num {
+      font-size: 34px;
+      color: rgba(22, 21, 19, 0.28);
+      font-weight: 700;
+      letter-spacing: -0.05em;
+    }
+
+    .flow-step strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 18px;
+    }
+
+    .flow-step span {
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .tag {
+      justify-self: end;
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      border: 1px solid var(--line);
+      background: white;
+    }
+
+    .tag.control { background: var(--accent-soft); }
+    .tag.ai { background: var(--accent-3-soft); }
+    .tag.human { background: var(--accent-2-soft); }
+    .tag.exception { background: rgba(185,28,28,0.1); }
+
+    .lane-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 26px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.86), rgba(255,255,255,0.68));
+      padding: 18px;
+    }
+
+    .lanes {
+      min-width: 980px;
+      display: grid;
+      grid-template-columns: 150px repeat(7, minmax(110px, 1fr));
+      gap: 10px;
+    }
+
+    .lane-h,
+    .lane-l,
+    .lane-c {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 12px;
+      min-height: 74px;
+    }
+
+    .lane-h {
+      background: #f7f2e8;
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .lane-l {
+      background: #f1ebdf;
+      display: flex;
+      align-items: center;
+      font-weight: 700;
+    }
+
+    .lane-c {
+      background: rgba(255,255,255,0.82);
+      font-size: 14px;
+      line-height: 1.45;
+      color: var(--muted);
+    }
+
+    .lane-c strong {
+      display: block;
+      color: var(--ink);
+      margin-bottom: 4px;
+    }
+
+    .bars {
+      display: grid;
+      gap: 14px;
+    }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: 170px 1fr 60px;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .track {
+      height: 16px;
+      border-radius: 999px;
+      background: rgba(22,21,19,0.08);
+      overflow: hidden;
+    }
+
+    .fill {
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--accent), #14b8a6);
+    }
+
+    .risk .fill { background: linear-gradient(90deg, var(--accent-2), #f59e0b); }
+    .ops .fill { background: linear-gradient(90deg, var(--accent-3), #a78bfa); }
+
+    .roadmap {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .phase {
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      padding: 18px;
+      background: rgba(255,255,255,0.82);
+    }
+
+    .phase strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 18px;
+    }
+
+    .phase p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    .diagram-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,255,255,0.72));
+      padding: 18px;
+    }
+
+    .diagram-note {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .mermaid {
+      min-width: 1100px;
+      text-align: center;
+    }
+
+    .footer {
+      text-align: center;
+      color: var(--muted);
+      font-size: 14px;
+      padding: 28px 0 8px;
+    }
+
+    @media (max-width: 1100px) {
+      .hero, .grid-2, .grid-3, .arch-row.two, .arch-row.three, .roadmap {
+        grid-template-columns: 1fr;
+      }
+      .hero { min-height: auto; }
+    }
+
+    @media (max-width: 760px) {
+      .page { width: min(calc(100% - 24px), var(--max)); padding-top: 12px; }
+      .hero-copy, .hero-visual, .section { padding: 22px; }
+      .panel { border-radius: 24px; }
+      h1 { max-width: none; font-size: clamp(40px, 15vw, 66px); }
+      .metrics, .runtime-grid { grid-template-columns: 1fr; }
+      .flow-step, .bar-row { grid-template-columns: 1fr; }
+      .tag { justify-self: start; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <div class="panel hero-copy">
+        <div>
+          <span class="eyebrow">Master Implementation Spec</span>
+          <h1>One control plane for messy finance requests.</h1>
+          <p>
+            This master plan consolidates the original implementation plan, the Harness-oriented runtime model,
+            and the deeper finance controls into one build-spec for SME Finance Ops Copilot.
+          </p>
+          <div class="chip-row">
+            <span class="chip primary">Canonical Master Plan</span>
+            <span class="chip">Case-first architecture</span>
+            <span class="chip">Harness-style stages</span>
+            <span class="chip">Finance-correct contracts</span>
+          </div>
+        </div>
+        <div class="metrics">
+          <div class="metric"><strong>4</strong><span>initial workflows on one engine</span></div>
+          <div class="metric"><strong>9</strong><span>named runtime stages</span></div>
+          <div class="metric"><strong>1</strong><span>team-facing source of truth</span></div>
+        </div>
+      </div>
+
+      <div class="panel hero-visual">
+        <div class="dark-head">
+          <span>Runtime viewpoint</span>
+          <span>SME Finance Ops Copilot</span>
+        </div>
+        <div class="runtime-card">
+          <div class="runtime-grid">
+            <div class="runtime-box"><strong>Case-first</strong>Every request becomes a persistent control object.</div>
+            <div class="runtime-box"><strong>AI-governed</strong>AI proposes fields, questions, and rationale, never silent approvals.</div>
+            <div class="runtime-box"><strong>Policy-driven</strong>Rules decide routes, blocks, and reconciliation triggers.</div>
+            <div class="runtime-box"><strong>Audit-closed</strong>Cases finish only when export and evidence are complete.</div>
+          </div>
+          <svg viewBox="0 0 760 300" width="100%" height="100%" aria-label="master runtime diagram">
+            <defs>
+              <linearGradient id="g1" x1="0" x2="1">
+                <stop offset="0%" stop-color="#14b8a6" stop-opacity="0.15"></stop>
+                <stop offset="50%" stop-color="#14b8a6" stop-opacity="1"></stop>
+                <stop offset="100%" stop-color="#a78bfa" stop-opacity="0.25"></stop>
+              </linearGradient>
+            </defs>
+            <path d="M58 192 C140 112, 208 104, 292 152 S448 232, 528 176 S650 120, 706 144" fill="none" stroke="url(#g1)" stroke-width="5" stroke-linecap="round"></path>
+            <g font-family="Segoe UI, sans-serif">
+              <g transform="translate(24 154)">
+                <rect width="120" height="70" rx="18" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.14)"></rect>
+                <text x="16" y="28" fill="#fff" font-size="16" font-weight="700">Web App</text>
+                <text x="16" y="48" fill="rgba(255,255,255,0.72)" font-size="12">requester to admin</text>
+              </g>
+              <g transform="translate(180 102)">
+                <rect width="138" height="72" rx="18" fill="rgba(124,58,237,0.14)" stroke="rgba(255,255,255,0.14)"></rect>
+                <text x="16" y="28" fill="#fff" font-size="16" font-weight="700">AI Harness</text>
+                <text x="16" y="48" fill="rgba(255,255,255,0.72)" font-size="12">extract, ask, propose</text>
+              </g>
+              <g transform="translate(356 158)">
+                <rect width="156" height="72" rx="18" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.14)"></rect>
+                <text x="16" y="28" fill="#fff" font-size="16" font-weight="700">Workflow Core</text>
+                <text x="16" y="48" fill="rgba(255,255,255,0.72)" font-size="12">state, policy, audit, queue</text>
+              </g>
+              <g transform="translate(546 108)">
+                <rect width="156" height="72" rx="18" fill="rgba(180,83,9,0.16)" stroke="rgba(255,255,255,0.14)"></rect>
+                <text x="16" y="28" fill="#fff" font-size="16" font-weight="700">Human Gates</text>
+                <text x="16" y="48" fill="rgba(255,255,255,0.72)" font-size="12">approval and finance review</text>
+              </g>
+              <g transform="translate(562 214)">
+                <rect width="140" height="60" rx="18" fill="rgba(20,184,166,0.14)" stroke="rgba(255,255,255,0.14)"></rect>
+                <text x="16" y="26" fill="#fff" font-size="15" font-weight="700">Export / Close</text>
+                <text x="16" y="44" fill="rgba(255,255,255,0.72)" font-size="12">or recoverable exception</text>
+              </g>
+            </g>
+          </svg>
+          <div class="legend">
+            <span><i class="dot" style="background:#14b8a6"></i>control plane</span>
+            <span><i class="dot" style="background:#a78bfa"></i>governed AI</span>
+            <span><i class="dot" style="background:#f59e0b"></i>human checkpoints</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel section">
+      <div class="section-head">
+        <div>
+          <span class="eyebrow">Product Core</span>
+          <h2>Not a claims app. A finance operations control plane.</h2>
+        </div>
+        <p>Every case must become understandable, controllable, reconcilable, and postable. That is the governing idea behind the full system.</p>
+      </div>
+      <div class="grid-3">
+        <div class="sub">
+          <h3>Persistent case object</h3>
+          <p>All artifacts, extractions, questions, policy outcomes, approvals, exports, and audit events attach to one stateful case.</p>
+        </div>
+        <div class="sub">
+          <h3>Governed AI</h3>
+          <p>GLM remains central for extraction and reasoning, but output is bounded by schemas, confidence, provenance, and human-controlled gates.</p>
+        </div>
+        <div class="sub">
+          <h3>Accounting-ready completion</h3>
+          <p>Completion means the normalized financial payload is valid and exportable, not merely that the UI looks complete.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel section">
+      <div class="section-head">
+        <div>
+          <span class="eyebrow">Platform Modules</span>
+          <h2>The master plan names the core modules explicitly.</h2>
+        </div>
+        <p>These modules make the plan easier to map to team ownership, implementation boundaries, and demo narrative.</p>
+      </div>
+      <div class="grid-3">
+        <div class="sub">
+          <h3>Claim &amp; Case Management</h3>
+          <p>Owns case lifecycle, artifact viewer, timeline, transitions, assignment, and case detail surfaces.</p>
+        </div>
+        <div class="sub">
+          <h3>AI Extraction &amp; Reasoning</h3>
+          <p>Parses messy inputs, extracts structured fields, generates clarification prompts, and supports FX estimation and reconciliation context.</p>
+        </div>
+        <div class="sub">
+          <h3>Fraud &amp; Duplicate Detection</h3>
+          <p>Uses extract and reason stages to detect exact duplicates, near duplicates, suspicious resubmissions, and anomaly signals before approval or export.</p>
+        </div>
+        <div class="sub">
+          <h3>Policy Engine &amp; Configuration</h3>
+          <p>Owns routing rules, spend thresholds, required fields, reconciliation checks, and admin policy configuration.</p>
+        </div>
+        <div class="sub">
+          <h3>User Management &amp; RBAC</h3>
+          <p>Owns authentication, organizational mapping, routing identity, and authorization boundaries.</p>
+        </div>
+        <div class="sub">
+          <h3>Audit, Reporting &amp; Export</h3>
+          <p>Owns immutable logging, finalized accounting payload generation, CSV or API handoff, export tracking, and basic operational analytics.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel section">
+      <div class="section-head">
+        <div>
+          <span class="eyebrow">Architecture</span>
+          <h2>Current modular monolith, shaped into a stronger runtime.</h2>
+        </div>
+        <p>The repo already contains the correct shape. The plan is to make the orchestration and finance semantics explicit, not to replace the stack.</p>
+      </div>
+      <div class="arch-stack">
+        <div class="arch-row two">
+          <div class="arch-box teal">
+            <span class="label">Frontend</span>
+            <h3>Next.js Web App</h3>
+            <p>Requester, approver, finance review, and admin surfaces. Next evolution: stage visibility, approval matrix visibility, and exception ownership.</p>
+          </div>
+          <div class="arch-box violet">
+            <span class="label">Reasoning</span>
+            <h3>AI Harness</h3>
+            <p>Mock GLM today, Z.AI seam ready. Outputs must be persisted as structured proposals with confidence, provenance, reasoning summary, and model metadata.</p>
+          </div>
+        </div>
+        <div class="arch-row two">
+          <div class="arch-box">
+            <span class="label">Control Core</span>
+            <h3>NestJS Workflow Control Plane</h3>
+            <p>Orchestrator, policy engine, approvals, finance review, export engine, audit service, and queue facade operating around a case-first lifecycle.</p>
+          </div>
+          <div class="arch-box amber">
+            <span class="label">Governance</span>
+            <h3>Policy + Human Gates</h3>
+            <p>Thresholds, duplicates, required fields, approval routing, finance escalation, reconciliation rules, and recoverable exception handling.</p>
+          </div>
+        </div>
+        <div class="arch-row three">
+          <div class="arch-box">
+            <span class="label">Persistence</span>
+            <h3>Postgres + Prisma</h3>
+            <p>Cases, states, artifacts, extractions, questions, policies, approvals, reviews, exports, settings, transitions, and audit history.</p>
+          </div>
+          <div class="arch-box">
+            <span class="label">Execution</span>
+            <h3>Inline Queue / BullMQ</h3>
+            <p>Good enough for MVP today and worker-backed later, with artifact processing, AI intake, policy routing, and export jobs.</p>
+          </div>
+          <div class="arch-box">
+            <span class="label">Adapters</span>
+            <h3>Mock-first Connectors</h3>
+            <p>Auth, storage, notifications, extraction, and export remain mocked for speed, with explicit seams preserved for real integrations.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel section">
+      <div class="section-head">
+        <div>
+          <span class="eyebrow">Harness Runtime</span>
+          <h2>Nine named stages define the system.</h2>
+        </div>
+        <p>These stages are the cleanest mental model for implementation, UI communication, and demo storytelling.</p>
+      </div>
+      <div class="flow">
+        <div class="flow-step"><div class="num">01</div><div><strong>Intake Harness</strong><span>Create a persistent case from notes, workflow type, and uploaded evidence.</span></div><div class="tag control">system</div></div>
+        <div class="flow-step"><div class="num">02</div><div><strong>Extraction Harness</strong><span>Process artifacts and convert evidence into structured usable signals.</span></div><div class="tag control">async</div></div>
+        <div class="flow-step"><div class="num">03</div><div><strong>AI Reasoning Harness</strong><span>Generate fields, provenance, confidence, questions, and next-step recommendations.</span></div><div class="tag ai">ai</div></div>
+        <div class="flow-step"><div class="num">04</div><div><strong>Clarification Gate</strong><span>Pause when information is missing, conflicting, or needs confirmation.</span></div><div class="tag human">requester</div></div>
+        <div class="flow-step"><div class="num">05</div><div><strong>Policy Gate</strong><span>Evaluate thresholds, duplicates, required fields, reconciliation checks, and routing decisions.</span></div><div class="tag control">policy</div></div>
+        <div class="flow-step"><div class="num">06</div><div><strong>Approval Matrix Gate</strong><span>Collect sequential, parallel, or delegated approvals where business sign-off is required.</span></div><div class="tag human">approval</div></div>
+        <div class="flow-step"><div class="num">07</div><div><strong>Finance Review Gate</strong><span>Handle blocked, risky, or accounting-sensitive cases before export.</span></div><div class="tag human">finance</div></div>
+        <div class="flow-step"><div class="num">08</div><div><strong>Export Harness</strong><span>Create the normalized payload and hand off to export processing.</span></div><div class="tag control">export</div></div>
+        <div class="flow-step"><div class="num">09</div><div><strong>Exception Recovery Harness</strong><span>Recover from extraction, AI, reconciliation, approval, or connector failures without losing traceability.</span></div><div class="tag exception">recovery</div></div>
+      </div>
+    </section>
+
+    <section class="panel section">
+      <div class="section-head">
+        <div>
+          <span class="eyebrow">Workflow</span>
+          <h2>End-to-end lifecycle of a finance case.</h2>
+        </div>
+        <p>The flagship prototype should show this flow visibly, especially the clarification, policy, approval, finance review, export, and exception paths.</p>
+      </div>
+      <div class="lane-wrap">
+        <div class="lanes">
+          <div></div>
+          <div class="lane-h">Submit</div>
+          <div class="lane-h">Extract</div>
+          <div class="lane-h">Reason</div>
+          <div class="lane-h">Clarify</div>
+          <div class="lane-h">Route</div>
+          <div class="lane-h">Resolve</div>
+          <div class="lane-h">Export</div>
+
+          <div class="lane-l">Requester</div>
+          <div class="lane-c"><strong>Create case</strong>Notes, files, workflow type.</div>
+          <div class="lane-c">Wait for artifact processing.</div>
+          <div class="lane-c">No direct action.</div>
+          <div class="lane-c"><strong>Answer questions</strong>Supply missing project code, FX proof, or tax clarification.</div>
+          <div class="lane-c">Observe routing.</div>
+          <div class="lane-c">May respond to send-back.</div>
+          <div class="lane-c">See final output and audit trail.</div>
+
+          <div class="lane-l">AI Harness</div>
+          <div class="lane-c">No action.</div>
+          <div class="lane-c"><strong>Artifact cues</strong>OCR text and evidence metadata.</div>
+          <div class="lane-c"><strong>Proposal</strong>Fields, confidence, provenance, open questions, rationale.</div>
+          <div class="lane-c">Re-evaluate after answers if needed.</div>
+          <div class="lane-c">Support routing rationale.</div>
+          <div class="lane-c">Support reviewer context.</div>
+          <div class="lane-c">Support audit summary.</div>
+
+          <div class="lane-l">Workflow Core</div>
+          <div class="lane-c"><strong>Persist state</strong>DRAFT to SUBMITTED.</div>
+          <div class="lane-c"><strong>Run jobs</strong>Artifact processing lifecycle.</div>
+          <div class="lane-c"><strong>Transition</strong>INTAKE_PROCESSING to requester info or policy review.</div>
+          <div class="lane-c"><strong>Resume</strong>Merge answer and continue controls.</div>
+          <div class="lane-c"><strong>Policy gate</strong>Approval matrix, finance review, or recoverable exception.</div>
+          <div class="lane-c"><strong>Track decisions</strong>Approvals, rejections, finance outcomes.</div>
+          <div class="lane-c"><strong>Close loop</strong>Export success or recoverable exception.</div>
+
+          <div class="lane-l">Human Gates</div>
+          <div class="lane-c">No action.</div>
+          <div class="lane-c">No action.</div>
+          <div class="lane-c">No action.</div>
+          <div class="lane-c">Requester action.</div>
+          <div class="lane-c"><strong>Approver / finance assigned</strong></div>
+          <div class="lane-c"><strong>Approve, reject, send back</strong>Decisions are attributed and audited.</div>
+          <div class="lane-c">Finance can retry or recover failures.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel section">
+      <div class="section-head">
+        <div>
+          <span class="eyebrow">State Machine</span>
+          <h2>Official lifecycle states.</h2>
+        </div>
+        <p>The runtime uses one canonical MVP state machine across all workflows. Deeper approval, FX, and tax logic operate inside these gates instead of creating extra top-level states.</p>
+      </div>
+      <div class="diagram-wrap">
+        <pre class="mermaid">
+stateDiagram-v2
+    direction LR
+
+    [*] --> DRAFT
+    DRAFT --> SUBMITTED
+    SUBMITTED --> INTAKE_PROCESSING
+
+    INTAKE_PROCESSING --> AWAITING_REQUESTER_INFO: needs clarification
+    INTAKE_PROCESSING --> POLICY_REVIEW: intake complete
+
+    AWAITING_REQUESTER_INFO --> POLICY_REVIEW: requester answered
+
+    POLICY_REVIEW --> AWAITING_APPROVAL: approval path
+    POLICY_REVIEW --> FINANCE_REVIEW: blocked or risky case
+
+    AWAITING_APPROVAL --> AWAITING_APPROVER_INFO_RESPONSE: approver asks question
+    AWAITING_APPROVER_INFO_RESPONSE --> AWAITING_APPROVAL: requester responded
+    AWAITING_APPROVAL --> APPROVED
+    AWAITING_APPROVAL --> REJECTED
+
+    FINANCE_REVIEW --> APPROVED
+    FINANCE_REVIEW --> REJECTED
+    FINANCE_REVIEW --> AWAITING_REQUESTER_INFO: send back
+    FINANCE_REVIEW --> EXPORT_READY
+    FINANCE_REVIEW --> RECOVERABLE_EXCEPTION
+
+    APPROVED --> EXPORT_READY
+    EXPORT_READY --> EXPORTING
+    EXPORTING --> EXPORTED
+    EXPORTING --> RECOVERABLE_EXCEPTION: export failure
+
+    RECOVERABLE_EXCEPTION --> INTAKE_PROCESSING: retry intake
+    RECOVERABLE_EXCEPTION --> POLICY_REVIEW: retry policy
+    RECOVERABLE_EXCEPTION --> EXPORT_READY: retry export
+
+    EXPORTED --> CLOSED
+    REJECTED --> CLOSED
+        </pre>
+      </div>
+      <p class="diagram-note">
+        Mermaid now renders the state machine directly in the browser. This should produce a much cleaner layout than the hand-drawn SVG as long as the page has internet access to load Mermaid.
+      </p>
+    </section>
+
+    <section class="panel section">
+      <div class="section-head">
+        <div>
+          <span class="eyebrow">Deep Finance Controls</span>
+          <h2>Real finance nuance is in scope at the architecture level now.</h2>
+        </div>
+        <p>The prototype stays focused, but the contracts and system model must already support the real-world finance controls that matter.</p>
+      </div>
+      <div class="grid-3">
+        <div class="sub">
+          <h3>Approval matrix</h3>
+          <p>Support sequential, parallel, conditional, and delegated approvals rather than assuming one flat approver forever.</p>
+        </div>
+        <div class="sub">
+          <h3>FX reconciliation</h3>
+          <p>Distinguish estimated market-rate conversion from realized settled amount backed by card or bank evidence.</p>
+        </div>
+        <div class="sub">
+          <h3>Tax segregation</h3>
+          <p>Normalize net, tax, and gross amounts and validate arithmetic before export readiness.</p>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-top:16px;">
+        <div class="sub">
+          <h3>Fraud &amp; Duplicate Detection: EXTRACT</h3>
+          <ul class="list">
+            <li>receipt or invoice number</li>
+            <li>merchant, vendor tax ID, and OCR text</li>
+            <li>amount, currency, spend date, and project code</li>
+            <li>filename, uploader identity, and artifact hash where available</li>
+          </ul>
+        </div>
+        <div class="sub">
+          <h3>Fraud &amp; Duplicate Detection: REASON</h3>
+          <ul class="list">
+            <li>classify exact duplicate versus near duplicate</li>
+            <li>detect suspicious resubmission or conflicting submission</li>
+            <li>generate rationale summary for reviewers</li>
+            <li>route to warning, finance review, or recoverable exception</li>
+          </ul>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-top:16px;">
+        <div class="sub ops">
+          <h3>Approval matrix structure</h3>
+          <div class="bars">
+            <div class="bar-row"><span>Sequential chain</span><div class="track"><div class="fill" style="width:88%"></div></div><strong>88</strong></div>
+            <div class="bar-row"><span>Parallel approval set</span><div class="track"><div class="fill" style="width:79%"></div></div><strong>79</strong></div>
+            <div class="bar-row"><span>Delegation support</span><div class="track"><div class="fill" style="width:70%"></div></div><strong>70</strong></div>
+            <div class="bar-row"><span>Finance coding review</span><div class="track"><div class="fill" style="width:76%"></div></div><strong>76</strong></div>
+          </div>
+        </div>
+        <div class="sub risk">
+          <h3>Reconciliation and exception pressure</h3>
+          <div class="bars">
+            <div class="bar-row"><span>FX mismatch risk</span><div class="track"><div class="fill" style="width:74%"></div></div><strong>74</strong></div>
+            <div class="bar-row"><span>Tax mismatch risk</span><div class="track"><div class="fill" style="width:81%"></div></div><strong>81</strong></div>
+            <div class="bar-row"><span>Duplicate suspicion</span><div class="track"><div class="fill" style="width:69%"></div></div><strong>69</strong></div>
+            <div class="bar-row"><span>Export failure path</span><div class="track"><div class="fill" style="width:77%"></div></div><strong>77</strong></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel section">
+      <div class="section-head">
+        <div>
+          <span class="eyebrow">Implementation Sequence</span>
+          <h2>Build depth where the prototype wins, then broaden safely.</h2>
+        </div>
+        <p>The roadmap balances team execution, demo clarity, and architecture integrity.</p>
+      </div>
+      <div class="roadmap">
+        <div class="phase"><strong>Phase 1</strong><p>Stabilize the current prototype: fix build issues, align API and web behavior, confirm documented state transitions.</p></div>
+        <div class="phase"><strong>Phase 2</strong><p>Formalize Harness runtime metadata: stage, manual action required, reasoning summary, failure mode, and better view models.</p></div>
+        <div class="phase"><strong>Phase 3</strong><p>Deepen finance correctness: approval matrix contracts, FX reconciliation fields, tax normalization, and recoverable exception categories.</p></div>
+        <div class="phase"><strong>Phase 4</strong><p>Polish the flagship expense-claim demo while keeping the shared engine broad enough for the other workflow types.</p></div>
+      </div>
+    </section>
+
+    <section class="panel section">
+      <div class="section-head">
+        <div>
+          <span class="eyebrow">Decision Summary</span>
+          <h2>The master spec locks one strong direction.</h2>
+        </div>
+        <p>This project should be built as a case-first finance control plane with governed AI, explicit workflow stages, richer finance contracts, and visible exception recovery.</p>
+      </div>
+      <div class="grid-2">
+        <div class="sub">
+          <h3>Keep</h3>
+          <ul class="list">
+            <li>Modular monolith architecture</li>
+            <li>Mock-first adapters</li>
+            <li>Case-first workflow model</li>
+            <li>Shared contracts in the workspace package</li>
+            <li>Human approval as mandatory control</li>
+          </ul>
+        </div>
+        <div class="sub">
+          <h3>Add next</h3>
+          <ul class="list">
+            <li>Canonical runtime stages</li>
+            <li>Approval matrix support</li>
+            <li>FX reconciliation fields</li>
+            <li>Tax-aware normalized exports</li>
+            <li>Explicit recoverable exception semantics</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <p class="footer">Standalone local artifact. Open directly in a browser for review.</p>
+  </main>
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: "base",
+      themeVariables: {
+        primaryColor: "#ffffff",
+        primaryTextColor: "#161513",
+        primaryBorderColor: "#d6cfc3",
+        lineColor: "#8a8176",
+        secondaryColor: "#eef8f7",
+        tertiaryColor: "#fff5ea",
+        background: "#fffaf1",
+        mainBkg: "#ffffff",
+        clusterBkg: "#fffaf1",
+        fontFamily: "Segoe UI, Inter, sans-serif"
+      },
+      state: {
+        useMaxWidth: true
+      },
+      flowchart: {
+        useMaxWidth: true,
+        htmlLabels: true,
+        curve: "basis"
+      }
+    });
+  </script>
+</body>
+</html>

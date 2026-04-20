@@ -1,0 +1,9 @@
+{
+  "name": "@finance-ops/shared",
+  "version": "0.1.0",
+  "private": true,
+  "main": "src/index.ts",
+  "dependencies": {
+    "zod": "^3.24.3"
+  }
+}
