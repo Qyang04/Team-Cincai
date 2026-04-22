@@ -1,16 +1,35 @@
+import Link from "next/link";
 import { ApprovalActionForm } from "./approval-action-form";
 
-const sidebarNotes = [
-  "Contract compliance and vendor history are visible before the approver acts.",
-  "Decision rationale is captured in-line so the approval trail remains reviewable.",
-  "Escalation stays available for cases that need finance intervention instead of immediate judgment.",
-] as const;
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
 
-async function getApprovalTasks() {
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
+type ApprovalTask = {
+  id: string;
+  approverId: string;
+  status: string;
+  decision?: string | null;
+  decisionReason?: string | null;
+  dueAt?: string | null;
+  createdAt: string;
+  case: {
+    id: string;
+    workflowType: string;
+    status: string;
+    priority: string;
+    requesterId: string;
+    createdAt: string;
+  };
+};
 
+async function getApprovalTasks(): Promise<ApprovalTask[]> {
   try {
-    const response = await fetch(`${apiBaseUrl}/cases/approvals/tasks`, { cache: "no-store" });
+    const response = await fetch(`${apiBaseUrl}/cases/approvals/tasks`, {
+      cache: "no-store",
+      headers: {
+        "x-mock-role": "APPROVER",
+        "x-mock-user-id": "manager.approver",
+      },
+    });
     if (!response.ok) {
       return [];
     }
@@ -18,6 +37,22 @@ async function getApprovalTasks() {
   } catch {
     return [];
   }
+}
+
+function humanizeWorkflow(workflowType: string): string {
+  return workflowType
+    .replace(/_/g, " ")
+    .toLowerCase()
+    .replace(/^./, (char) => char.toUpperCase());
+}
+
+function formatRelative(dateString: string): string {
+  const diffMs = Date.now() - new Date(dateString).getTime();
+  const diffHours = Math.round(diffMs / (1000 * 60 * 60));
+  if (Math.abs(diffHours) < 1) return "just now";
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.round(diffHours / 24);
+  return `${diffDays}d ago`;
 }
 
 export default async function ApprovalsPage() {
@@ -30,99 +65,81 @@ export default async function ApprovalsPage() {
           <span className="kicker">Approval lane</span>
           <h1>Pending approvals</h1>
           <p className="section-copy">
-            Review cases requiring SME oversight. AI has pre-processed the request context so decisions stay fast and auditable.
+            Review cases routed by policy. Each decision is captured in the audit trail with rationale.
           </p>
         </div>
         <div className="split-actions">
-          <button className="button-secondary" type="button">
-            Filter
-          </button>
-          <button className="button-primary" type="button">
-            Export batch
-          </button>
+          <span className="inline-status">
+            {tasks.length} pending task{tasks.length === 1 ? "" : "s"}
+          </span>
         </div>
       </section>
 
-      <section className="approval-layout">
-        <div className="queue-grid" style={{ gridTemplateColumns: "1fr" }}>
-          {tasks.length ? (
-            tasks.map(
-              (
-                task: { id: string; approverId: string; case: { id: string; workflowType: string } },
-                index: number,
-              ) => (
-              <article key={task.id} className={`queue-item approval-card ${index === 0 ? "queue-highlight" : ""}`}>
-                <div className="approval-topline">
-                  <div>
-                    <p className="eyebrow">Case {task.case.id}</p>
-                    <h2>{task.case.workflowType.replaceAll("_", " ")}</h2>
-                  </div>
-                  <div className="stack-list" style={{ justifyItems: "end" }}>
-                    <span className="inline-status inline-status-attention">Approval required</span>
-                    <strong>{task.approverId}</strong>
-                  </div>
-                </div>
-
-                <div className="decision-strip">
-                  <p className="detail-label">AI reasoning summary</p>
+      <section className="queue-grid" style={{ gridTemplateColumns: "1fr" }}>
+        {tasks.length ? (
+          tasks.map((task, index) => (
+            <article
+              key={task.id}
+              className={`queue-item approval-card ${index === 0 ? "queue-highlight" : ""}`}
+            >
+              <div className="approval-topline">
+                <div>
+                  <p className="eyebrow">Case {task.case.id}</p>
+                  <h2>{humanizeWorkflow(task.case.workflowType)}</h2>
                   <p className="muted">
-                    Policy review passed, evidence appears complete, and the case is ready for manager judgment with rationale capture.
+                    Requested by {task.case.requesterId} · opened {formatRelative(task.case.createdAt)}
                   </p>
                 </div>
-
-                <div className="detail-grid">
-                  <div>
-                    <p className="detail-label">Workflow</p>
-                    <p>{task.case.workflowType}</p>
-                  </div>
-                  <div>
-                    <p className="detail-label">Assigned approver</p>
-                    <p>{task.approverId}</p>
-                  </div>
+                <div className="stack-list" style={{ justifyItems: "end" }}>
+                  <span className="inline-status inline-status-attention">Approval required</span>
+                  <span className="inline-status">Priority {task.case.priority}</span>
+                  <span className="inline-status">Case status {task.case.status}</span>
                 </div>
-
-                <div className="action-stack">
-                  <ApprovalActionForm taskId={task.id} mode="approve" />
-                  <ApprovalActionForm taskId={task.id} mode="reject" />
-                  <ApprovalActionForm taskId={task.id} mode="request-info" />
-                </div>
-              </article>
-              ),
-            )
-          ) : (
-            <article className="empty-state">
-              <div>
-                <p className="eyebrow">Queue state</p>
-                <h2>No pending approvals</h2>
-                <p className="muted">Once policy review clears a case, it will appear here with decision controls attached.</p>
               </div>
+
+              <div className="detail-grid">
+                <div>
+                  <p className="detail-label">Assigned approver</p>
+                  <p>{task.approverId}</p>
+                </div>
+                <div>
+                  <p className="detail-label">Task opened</p>
+                  <p>{new Date(task.createdAt).toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="detail-label">Due</p>
+                  <p>{task.dueAt ? new Date(task.dueAt).toLocaleString() : "No due date"}</p>
+                </div>
+                <div>
+                  <p className="detail-label">Task status</p>
+                  <p>{task.status}</p>
+                </div>
+              </div>
+
+              <div className="split-actions" style={{ marginTop: 8 }}>
+                <Link className="button-secondary" href={`/cases/${task.case.id}`}>
+                  Open case detail
+                </Link>
+              </div>
+
+              <ApprovalActionForm taskId={task.id} />
             </article>
-          )}
-        </div>
-
-        <aside className="stack-list">
-          <article className="sidebar-note">
-            <p className="eyebrow">Reasoning summary</p>
-            <h2>What the approver sees first</h2>
-            <div className="insight-list">
-              {sidebarNotes.map((note) => (
-                <div key={note} className="insight-item">
-                  <p className="muted">{note}</p>
-                </div>
-              ))}
-            </div>
-            <div className="case-summary-grid" style={{ marginTop: 16 }}>
-              <div className="metric-tile metric-neutral">
-                <span className="metric-label">Real-time savings</span>
-                <div className="metric-number">$42,104</div>
-              </div>
-              <div className="metric-tile metric-neutral">
-                <span className="metric-label">Avg. approval time</span>
-                <div className="metric-number">2.4h</div>
-              </div>
+          ))
+        ) : (
+          <article className="empty-state">
+            <div>
+              <p className="eyebrow">Queue state</p>
+              <h2>No pending approvals</h2>
+              <p className="muted">
+                Once policy review routes a case to approval, it will appear here with decision controls.
+              </p>
+              <p className="muted">
+                If you expected a task, confirm the API is running at <code>{apiBaseUrl}</code> and that policy routed
+                the case to <code>AWAITING_APPROVAL</code>.
+              </p>
             </div>
           </article>
-        </aside>
+        )}
       </section>
     </div>
   );

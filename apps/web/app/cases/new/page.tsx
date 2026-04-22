@@ -24,10 +24,10 @@ export default function NewCasePage() {
         <article className="surface surface-large">
           <div className="surface-head">
             <div>
-              <p className="eyebrow">AI extraction engine active</p>
-              <h2>Request intake</h2>
+              <p className="eyebrow">Intake form</p>
+              <h2>Submit request</h2>
             </div>
-            <span className="inline-status">Live mode</span>
+            <span className="inline-status">Backed by live API</span>
           </div>
           <CaseForm />
         </article>
@@ -47,6 +47,10 @@ export default function NewCasePage() {
               </div>
             ))}
           </div>
+          <p className="muted" style={{ marginTop: 16 }}>
+            After submission, the AI intake harness extracts structured fields, raises clarification questions when
+            evidence is thin, and the policy engine routes the case to approval or finance review.
+          </p>
         </aside>
       </section>
     </div>

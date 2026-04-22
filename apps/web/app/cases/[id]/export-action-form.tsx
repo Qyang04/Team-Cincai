@@ -1,39 +1,52 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
 
+type Feedback = { kind: "success"; message: string } | { kind: "error"; message: string } | null;
+
 export function ExportActionForm({ caseId }: { caseId: string }) {
-  const [message, setMessage] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<Feedback>(null);
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
 
   function handleClick() {
-    setMessage(null);
+    setFeedback(null);
 
     startTransition(async () => {
       try {
         const response = await fetch(`${apiBaseUrl}/cases/${caseId}/export`, {
           method: "POST",
+          headers: {
+            "x-mock-role": "FINANCE_REVIEWER",
+          },
         });
 
         if (!response.ok) {
-          throw new Error("Export failed.");
+          throw new Error(`Export failed (${response.status}).`);
         }
 
-        setMessage("Export triggered. Refresh to see the updated case status.");
+        setFeedback({ kind: "success", message: "Export triggered. Refreshing case state..." });
+        router.refresh();
       } catch (error) {
-        setMessage(error instanceof Error ? error.message : "Unexpected export error.");
+        setFeedback({
+          kind: "error",
+          message: error instanceof Error ? error.message : "Unexpected export error.",
+        });
       }
     });
   }
 
   return (
-    <div className="inline-form">
+    <div className="inline-form" style={{ marginTop: 12 }}>
       <button type="button" onClick={handleClick} disabled={isPending} className="button-primary">
         {isPending ? "Exporting..." : "Run export"}
       </button>
-      {message ? <p className="muted">{message}</p> : null}
+      {feedback ? (
+        <p className={feedback.kind === "error" ? "text-danger" : "muted"}>{feedback.message}</p>
+      ) : null}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
@@ -9,13 +10,21 @@ type QuestionResponseFormProps = {
   questionId: string;
 };
 
+type Feedback = { kind: "success"; message: string } | { kind: "error"; message: string } | null;
+
 export function QuestionResponseForm({ caseId, questionId }: QuestionResponseFormProps) {
-  const [message, setMessage] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<Feedback>(null);
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
 
   function handleSubmit(formData: FormData) {
-    const answer = String(formData.get("answer") ?? "");
-    setMessage(null);
+    const answer = String(formData.get("answer") ?? "").trim();
+    setFeedback(null);
+
+    if (!answer) {
+      setFeedback({ kind: "error", message: "Answer cannot be empty." });
+      return;
+    }
 
     startTransition(async () => {
       try {
@@ -26,12 +35,16 @@ export function QuestionResponseForm({ caseId, questionId }: QuestionResponseFor
         });
 
         if (!response.ok) {
-          throw new Error("Failed to submit clarification response.");
+          throw new Error(`Failed to submit clarification (${response.status}).`);
         }
 
-        setMessage("Response saved. Refresh the page to see updated status.");
+        setFeedback({ kind: "success", message: "Response saved. Refreshing case state..." });
+        router.refresh();
       } catch (error) {
-        setMessage(error instanceof Error ? error.message : "Unexpected clarification error.");
+        setFeedback({
+          kind: "error",
+          message: error instanceof Error ? error.message : "Unexpected clarification error.",
+        });
       }
     });
   }
@@ -42,10 +55,8 @@ export function QuestionResponseForm({ caseId, questionId }: QuestionResponseFor
       <button type="submit" disabled={isPending} className="button-primary">
         {isPending ? "Saving..." : "Send response"}
       </button>
-      {message ? (
-        <p className="muted">
-          {message}
-        </p>
+      {feedback ? (
+        <p className={feedback.kind === "error" ? "text-danger" : "muted"}>{feedback.message}</p>
       ) : null}
     </form>
   );
