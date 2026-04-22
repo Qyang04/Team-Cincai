@@ -15,9 +15,11 @@ Greenfield implementation scaffold for a finance-operations workflow platform po
 - `apps/api`: workflow engine, AI orchestration, policy engine, approval flow
 - `packages/shared`: shared domain types, schemas, and workflow constants
 
+## Backend Runtime Notes
+- `apps/api/README.md`: current backend handoff, known-safe endpoints, mock-auth headers, and demo verification scenarios
+
 ## Next Steps
 1. Install dependencies with `npm.cmd install`
 2. Start local services with `docker compose up -d`
 3. Implement real auth/storage and queue wiring
 4. Replace mock connectors with production integrations over time
-
