@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition, type ClipboardEvent, type DragEvent } from "react";
 
 const workflowOptions = [
   { value: "EXPENSE_CLAIM", label: "Expense claim" },
@@ -48,10 +48,62 @@ type SubmissionState =
   | { kind: "success"; data: SubmissionSuccess }
   | { kind: "error"; error: string };
 
+const defaultFilenames = ["lunch-receipt.jpg", "parking-receipt.jpg"];
+
 export function CaseForm() {
   const [state, setState] = useState<SubmissionState>({ kind: "idle" });
+  const [filenames, setFilenames] = useState<string[]>(defaultFilenames);
+  const [isDragging, setIsDragging] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const router = useRouter();
+
+  function addFilenames(names: string[]) {
+    const trimmed = names.map((name) => name.trim()).filter(Boolean);
+    if (!trimmed.length) return;
+    setFilenames((current) => {
+      const seen = new Set(current);
+      const merged = [...current];
+      for (const name of trimmed) {
+        if (!seen.has(name)) {
+          seen.add(name);
+          merged.push(name);
+        }
+      }
+      return merged;
+    });
+  }
+
+  function handleFilesFromList(files: FileList | null | undefined) {
+    if (!files || !files.length) return;
+    addFilenames(Array.from(files).map((file) => file.name));
+  }
+
+  function handleDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setIsDragging(false);
+    handleFilesFromList(event.dataTransfer?.files);
+  }
+
+  function handlePaste(event: ClipboardEvent<HTMLDivElement>) {
+    const items = event.clipboardData?.items;
+    if (!items) return;
+    const names: string[] = [];
+    for (const item of Array.from(items)) {
+      const file = item.getAsFile?.();
+      if (file) {
+        names.push(file.name || `pasted-${Date.now()}.${item.type.split("/")[1] ?? "bin"}`);
+      }
+    }
+    if (names.length) {
+      event.preventDefault();
+      addFilenames(names);
+    }
+  }
+
+  function removeFilename(target: string) {
+    setFilenames((current) => current.filter((name) => name !== target));
+  }
 
   function handleSubmit(formData: FormData) {
     setState({ kind: "idle" });
@@ -59,10 +111,7 @@ export function CaseForm() {
     const workflowType = String(formData.get("workflowType") ?? "EXPENSE_CLAIM");
     const requesterId = String(formData.get("requesterId") ?? "").trim() || "demo.requester";
     const notes = String(formData.get("notes") ?? "");
-    const filenames = String(formData.get("filenames") ?? "")
-      .split("\n")
-      .map((item) => item.trim())
-      .filter(Boolean);
+    const submittedFilenames = filenames.map((name) => name.trim()).filter(Boolean);
 
     startTransition(async () => {
       try {
@@ -88,7 +137,7 @@ export function CaseForm() {
             "x-mock-user-id": requesterId,
             "x-mock-role": "REQUESTER",
           },
-          body: JSON.stringify({ notes, filenames }),
+          body: JSON.stringify({ notes, filenames: submittedFilenames }),
         });
 
         if (!submitResponse.ok) {
@@ -119,16 +168,83 @@ export function CaseForm() {
   return (
     <form action={handleSubmit} className="form-grid">
       <div className="stack-list">
-        <div className="intake-dropzone">
+        <div
+          className="intake-dropzone"
+          role="button"
+          tabIndex={0}
+          onClick={() => fileInputRef.current?.click()}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              fileInputRef.current?.click();
+            }
+          }}
+          onDragOver={(event) => {
+            event.preventDefault();
+            setIsDragging(true);
+          }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={handleDrop}
+          onPaste={handlePaste}
+          style={{
+            cursor: "pointer",
+            outline: isDragging ? "2px dashed var(--accent)" : undefined,
+            outlineOffset: isDragging ? "-6px" : undefined,
+            transition: "outline 120ms ease",
+          }}
+          aria-label="Click, drop, or paste files to stage them for this case"
+        >
           <div>
             <div className="dropzone-icon">AI</div>
             <strong>Stage the evidence for this request</strong>
             <p className="muted">
-              Paste filenames below to simulate uploaded receipts, invoices, or screenshots. The backend will attach them
-              as artifacts and run AI intake against your notes.
+              Click to pick files, drag and drop them here, or paste (Ctrl+V) a copied file or screenshot. Only the
+              filenames are sent to the backend — the mock storage layer records them as artifacts.
             </p>
           </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            hidden
+            onChange={(event) => {
+              handleFilesFromList(event.target.files);
+              event.target.value = "";
+            }}
+          />
         </div>
+
+        {filenames.length ? (
+          <div className="stack-list" style={{ gap: 8 }}>
+            <p className="detail-label">Staged filenames</p>
+            <div className="split-actions" style={{ flexWrap: "wrap", gap: 8, justifyContent: "flex-start" }}>
+              {filenames.map((name) => (
+                <span
+                  key={name}
+                  className="inline-status"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                >
+                  <code>{name}</code>
+                  <button
+                    type="button"
+                    aria-label={`Remove ${name}`}
+                    onClick={() => removeFilename(name)}
+                    style={{
+                      border: "none",
+                      background: "transparent",
+                      cursor: "pointer",
+                      fontSize: "1rem",
+                      lineHeight: 1,
+                      padding: 0,
+                    }}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         <div className="field-grid">
           <label className="field">
@@ -170,13 +286,20 @@ export function CaseForm() {
         </label>
 
         <label className="field">
-          <span className="field-label">Artifact filenames</span>
+          <span className="field-label">Artifact filenames (editable)</span>
           <textarea
-            name="filenames"
             rows={4}
-            defaultValue={"lunch-receipt.jpg\nparking-receipt.jpg"}
+            value={filenames.join("\n")}
+            onChange={(event) =>
+              setFilenames(
+                event.target.value
+                  .split("\n")
+                  .map((item) => item.trim())
+                  .filter(Boolean),
+              )
+            }
             className="field-control field-control-mono"
-            placeholder="one filename per line"
+            placeholder="one filename per line — or drop / paste files above"
             suppressHydrationWarning
           />
         </label>
@@ -197,6 +320,7 @@ export function CaseForm() {
           suppressHydrationWarning
           onClick={() => {
             setState({ kind: "idle" });
+            setFilenames(defaultFilenames);
             router.refresh();
           }}
         >
