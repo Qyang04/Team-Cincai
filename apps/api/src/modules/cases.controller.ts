@@ -244,6 +244,15 @@ export class CasesController {
     return this.workflowOrchestrator.runPolicyAndRoute(id);
   }
 
+  @Post(":id/recover")
+  @Roles("FINANCE_REVIEWER", "ADMIN")
+  recoverCase(@Param("id") id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.workflowOrchestrator.recoverCase(id, {
+      actorId: user.id,
+      actorType: user.roles.includes("ADMIN") ? "ADMIN" : "FINANCE_REVIEWER",
+    });
+  }
+
   @Get(":id/policy-result")
   getLatestPolicyResult(@Param("id") id: string) {
     return this.policyService.getLatestPolicyResult(id);

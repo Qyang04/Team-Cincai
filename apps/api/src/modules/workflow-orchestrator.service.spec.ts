@@ -10,6 +10,7 @@ function createWorkflowOrchestratorHarness() {
   const processedUploads: Array<Record<string, unknown>> = [];
   const persistedIntakeResults: Array<Record<string, unknown>> = [];
   const dispatchCalls: Array<Record<string, unknown>> = [];
+  let currentStatus = "DRAFT";
 
   const createdArtifacts = [
     { id: "artifact-1", storageUri: "mock://artifacts/receipt.jpg" },
@@ -19,7 +20,7 @@ function createWorkflowOrchestratorHarness() {
   const casesService = {
     getCase: async () => ({
       id: "case-1",
-      status: "DRAFT",
+      status: currentStatus,
       workflowType: "EXPENSE_CLAIM",
       requesterId: "demo.requester",
     }),
@@ -28,6 +29,7 @@ function createWorkflowOrchestratorHarness() {
   const workflowService = {
     transitionCase: async (input: Record<string, unknown>) => {
       transitions.push(input);
+      currentStatus = String(input.to);
       return { id: input.caseId, status: input.to };
     },
   };
@@ -136,6 +138,9 @@ function createWorkflowOrchestratorHarness() {
     dispatchCalls,
     aiResult,
     policyRouteResult,
+    setCurrentStatus: (status: string) => {
+      currentStatus = status;
+    },
   };
 }
 
@@ -212,4 +217,20 @@ test("WorkflowOrchestratorService returns clarification state when AI intake nee
   assert.equal(harness.persistedIntakeResults.length, 1);
   assert.equal(harness.auditEvents[1]?.eventType, "ARTIFACT_UPLOADED");
   assert.equal(harness.auditEvents[harness.auditEvents.length - 1]?.eventType, "AI_INTAKE_ANALYZED");
+});
+
+test("WorkflowOrchestratorService recovers recoverable exceptions by re-entering policy routing", async () => {
+  const harness = createWorkflowOrchestratorHarness();
+  harness.setCurrentStatus("RECOVERABLE_EXCEPTION");
+
+  const result = await harness.service.recoverCase("case-1", {
+    actorId: "configured.finance",
+    actorType: "FINANCE_REVIEWER",
+  });
+
+  assert.deepEqual(
+    harness.transitions.map((transition) => transition.to),
+    ["POLICY_REVIEW"],
+  );
+  assert.deepEqual(result, harness.policyRouteResult);
 });

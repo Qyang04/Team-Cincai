@@ -41,6 +41,34 @@ export class WorkflowOrchestratorService {
     );
   }
 
+  async recoverCase(
+    caseId: string,
+    actor: {
+      actorType: "FINANCE_REVIEWER" | "ADMIN";
+      actorId: string;
+    },
+  ) {
+    const existing = await this.casesService.getCase(caseId);
+    if (!existing) {
+      return { error: "Case not found" } as const;
+    }
+
+    if (existing.status !== "RECOVERABLE_EXCEPTION") {
+      return { error: "Case is not in recoverable exception" } as const;
+    }
+
+    await this.workflowService.transitionCase({
+      caseId,
+      from: "RECOVERABLE_EXCEPTION",
+      to: "POLICY_REVIEW",
+      actorType: actor.actorType,
+      actorId: actor.actorId,
+      note: "Manual recovery triggered from recoverable exception.",
+    });
+
+    return this.runPolicyAndRoute(caseId);
+  }
+
   async submitDraftCase(caseId: string, input: { notes?: string; filenames: string[] }) {
     const existing = await this.casesService.getCase(caseId);
     if (!existing) {

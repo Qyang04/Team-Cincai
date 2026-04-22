@@ -11,6 +11,7 @@ function createCasesControllerHarness(options?: {
   const auditEvents: Array<Record<string, unknown>> = [];
   const reopenedTasks: string[] = [];
   const runPolicyCalls: string[] = [];
+  const recoverCalls: string[] = [];
   const createdQuestions: Array<Record<string, unknown>> = [];
   const resolvedReviews: Array<Record<string, unknown>> = [];
 
@@ -99,6 +100,16 @@ function createCasesControllerHarness(options?: {
       runPolicyCalls.push(caseId);
       return null;
     },
+    recoverCase: async (caseId: string, actor: Record<string, unknown>) => {
+      recoverCalls.push(caseId);
+      return {
+        case: {
+          id: caseId,
+          status: "AWAITING_APPROVAL",
+        },
+        actor,
+      };
+    },
     submitDraftCase: async () => undefined,
     processArtifactUpload: async () => undefined,
     processExport: async () => undefined,
@@ -143,6 +154,7 @@ function createCasesControllerHarness(options?: {
     auditEvents,
     reopenedTasks,
     runPolicyCalls,
+    recoverCalls,
     createdQuestions,
     resolvedReviews,
   };
@@ -260,4 +272,25 @@ test("CasesController send-back keeps finance review visible as a requester clar
       source: "FINANCE_REVIEW",
     },
   ]);
+});
+
+test("CasesController recovers a case from recoverable exception back into policy routing", async () => {
+  const harness = createCasesControllerHarness();
+
+  const result = await harness.controller.recoverCase("case-1", {
+    id: "configured.finance",
+    roles: ["FINANCE_REVIEWER"],
+  } as never);
+
+  assert.deepEqual(harness.recoverCalls, ["case-1"]);
+  assert.deepEqual(result, {
+    case: {
+      id: "case-1",
+      status: "AWAITING_APPROVAL",
+    },
+    actor: {
+      actorId: "configured.finance",
+      actorType: "FINANCE_REVIEWER",
+    },
+  });
 });
