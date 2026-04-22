@@ -30,6 +30,17 @@ export class ApprovalsService {
     });
   }
 
+  async getLatestInfoRequestedTask(caseId: string) {
+    return this.prisma.approvalTask.findFirst({
+      where: {
+        caseId,
+        status: "INFO_REQUESTED",
+      },
+      orderBy: { createdAt: "desc" },
+      include: { case: true },
+    });
+  }
+
   async markApproved(taskId: string, decisionReason?: string) {
     return this.prisma.approvalTask.update({
       where: { id: taskId },
@@ -62,5 +73,15 @@ export class ApprovalsService {
       },
     });
   }
-}
 
+  async reopenTask(taskId: string) {
+    return this.prisma.approvalTask.update({
+      where: { id: taskId },
+      data: {
+        status: "PENDING",
+        decision: null,
+        decisionReason: null,
+      },
+    });
+  }
+}

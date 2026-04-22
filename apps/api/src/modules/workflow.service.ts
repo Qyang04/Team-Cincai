@@ -31,10 +31,30 @@ export class WorkflowService {
     this.telemetry.mark("workflow.lastTransitionAt");
 
     return this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      const updatedCase = await tx.case.update({
+      const currentCase = await tx.case.findUnique({
         where: { id: input.caseId },
+        select: { id: true, status: true },
+      });
+
+      if (!currentCase) {
+        throw new Error("Case not found");
+      }
+
+      if (currentCase.status !== input.from) {
+        throw new Error(`Case ${input.caseId} is ${currentCase.status}, expected ${input.from}`);
+      }
+
+      const updateResult = await tx.case.updateMany({
+        where: {
+          id: input.caseId,
+          status: input.from,
+        },
         data: { status: input.to },
       });
+
+      if (updateResult.count !== 1) {
+        throw new Error(`Case ${input.caseId} is no longer ${input.from}`);
+      }
 
       await tx.workflowTransition.create({
         data: {
@@ -61,7 +81,10 @@ export class WorkflowService {
         },
       });
 
-      return updatedCase;
+      return {
+        ...currentCase,
+        status: input.to,
+      };
     });
   }
 }

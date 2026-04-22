@@ -162,13 +162,25 @@ export class CasesController {
     const input = answerQuestionSchema.parse(body);
     const answered = await this.intakeService.answerQuestion(id, questionId, input.answer);
     const caseRecord = await this.casesService.getCase(id);
+    const allQuestionsAnswered = caseRecord?.openQuestions.every(
+      (question) => question.status === "ANSWERED",
+    );
+
+    await this.auditService.recordEvent({
+      caseId: id,
+      eventType: "QUESTION_ANSWERED",
+      actorType: "REQUESTER",
+      actorId: caseRecord?.requesterId,
+      payload: {
+        questionId,
+        answer: input.answer,
+      },
+    });
 
     if (
       caseRecord &&
       caseRecord.status === "AWAITING_REQUESTER_INFO" &&
-      caseRecord.openQuestions.every((question) =>
-        question.id === questionId ? true : question.status === "ANSWERED",
-      )
+      allQuestionsAnswered
     ) {
       await this.workflowService.transitionCase({
         caseId: id,
@@ -185,10 +197,25 @@ export class CasesController {
     if (
       caseRecord &&
       caseRecord.status === "AWAITING_APPROVER_INFO_RESPONSE" &&
-      caseRecord.openQuestions.every((question) =>
-        question.id === questionId ? true : question.status === "ANSWERED",
-      )
+      allQuestionsAnswered
     ) {
+      const approvalTask = await this.approvalsService.getLatestInfoRequestedTask(id);
+
+      if (!approvalTask) {
+        await this.auditService.recordEvent({
+          caseId: id,
+          eventType: "APPROVAL_REENTRY_FAILED",
+          actorType: "SYSTEM",
+          payload: {
+            questionId,
+            currentStatus: caseRecord.status,
+          },
+        });
+
+        throw new Error("Approval task awaiting requester response not found");
+      }
+
+      await this.approvalsService.reopenTask(approvalTask.id);
       await this.workflowService.transitionCase({
         caseId: id,
         from: "AWAITING_APPROVER_INFO_RESPONSE",
@@ -198,17 +225,6 @@ export class CasesController {
         note: "Requester answered approver follow-up questions.",
       });
     }
-
-    await this.auditService.recordEvent({
-      caseId: id,
-      eventType: "QUESTION_ANSWERED",
-      actorType: "REQUESTER",
-      actorId: caseRecord?.requesterId,
-      payload: {
-        questionId,
-        answer: input.answer,
-      },
-    });
 
     return answered;
   }

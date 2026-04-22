@@ -1,6 +1,7 @@
 import { Injectable, OnModuleInit } from "@nestjs/common";
 import { ArtifactExtractionService } from "./artifact-extraction.service";
 import { queueNames } from "./queue.constants";
+import { AdminConfigService } from "./admin-config.service";
 import { AiGatewayService } from "./ai-gateway.service";
 import { ApprovalsService } from "./approvals.service";
 import { AuditService } from "./audit.service";
@@ -28,6 +29,7 @@ export class WorkflowExecutionService implements OnModuleInit {
     private readonly notificationsService: NotificationsService,
     private readonly telemetry: TelemetryService,
     private readonly jobRunner: JobRunnerService,
+    private readonly adminConfigService: AdminConfigService,
   ) {}
 
   onModuleInit() {
@@ -59,6 +61,7 @@ export class WorkflowExecutionService implements OnModuleInit {
     }
 
     const policyResult = await this.policyService.evaluateCase(payload.caseId);
+    const routingConfig = await this.adminConfigService.getRoutingConfig();
 
     await this.auditService.recordEvent({
       caseId: payload.caseId,
@@ -82,7 +85,7 @@ export class WorkflowExecutionService implements OnModuleInit {
       );
       await this.notificationsService.send({
         type: "finance-review-required",
-        recipientId: "finance.reviewer",
+        recipientId: routingConfig.financeReviewerId,
         subject: "Finance review required",
         body: `Case ${payload.caseId} requires finance review.`,
         caseId: payload.caseId,
@@ -98,10 +101,10 @@ export class WorkflowExecutionService implements OnModuleInit {
       note: "Policy evaluation routed case to manager approval.",
     });
 
-    await this.approvalsService.createTask(payload.caseId, "manager.approver");
+    await this.approvalsService.createTask(payload.caseId, routingConfig.defaultApproverId);
     await this.notificationsService.send({
       type: "approval-required",
-      recipientId: "manager.approver",
+      recipientId: routingConfig.defaultApproverId,
       subject: "Approval required",
       body: `Case ${payload.caseId} is awaiting approval.`,
       caseId: payload.caseId,
