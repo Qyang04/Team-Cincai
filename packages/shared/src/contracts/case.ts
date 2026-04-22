@@ -1,0 +1,271 @@
+import { z } from "zod";
+import { actorTypes, caseStatuses, roleTypes, workflowTypes } from "../domain/workflow";
+
+const isoDateTimeStringSchema = z.string().datetime({ offset: true });
+const nullableStringSchema = z.string().nullable();
+const nullableIsoDateTimeStringSchema = isoDateTimeStringSchema.nullable();
+const caseFieldValueSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);
+const recordOfUnknownSchema = z.record(z.string(), z.unknown());
+const recordOfStringsSchema = z.record(z.string(), z.string());
+const stringArraySchema = z.array(z.string());
+
+export const casePrioritySchema = z.enum(["LOW", "MEDIUM", "HIGH"]);
+export type CasePriority = z.infer<typeof casePrioritySchema>;
+
+export const artifactTypeSchema = z.enum(["RECEIPT", "INVOICE", "SCREENSHOT", "NOTE", "OTHER"]);
+export type ArtifactType = z.infer<typeof artifactTypeSchema>;
+
+export const structuredFieldsViewSchema = z.object({
+  amount: z.number().optional(),
+  currency: z.string().optional(),
+  merchant: z.string().optional(),
+  invoiceNumber: z.string().optional(),
+  spendDate: z.string().optional(),
+  purpose: z.string().optional(),
+  costCenter: z.string().optional(),
+  vendorName: z.string().optional(),
+  projectCode: z.string().optional(),
+  originalAmount: z.number().optional(),
+  originalCurrency: z.string().optional(),
+  baseCurrency: z.string().optional(),
+  estimatedFxRate: z.number().optional(),
+  estimatedBaseAmount: z.number().optional(),
+  realizedBaseAmount: z.number().optional(),
+  realizedFxSource: z.string().optional(),
+  netAmount: z.number().optional(),
+  taxAmount: z.number().optional(),
+  grossAmount: z.number().optional(),
+  vendorTaxId: z.string().optional(),
+  amountDiscrepancyFlag: z.boolean().optional(),
+  taxMismatchFlag: z.boolean().optional(),
+});
+export type StructuredFieldsView = z.infer<typeof structuredFieldsViewSchema>;
+
+export const caseSummarySchema = z.object({
+  id: z.string().min(1),
+  workflowType: z.enum(workflowTypes),
+  status: z.enum(caseStatuses),
+  requesterId: z.string().min(1),
+  assignedTo: nullableStringSchema.optional(),
+  priority: casePrioritySchema,
+  createdAt: isoDateTimeStringSchema,
+  updatedAt: isoDateTimeStringSchema,
+});
+export type CaseSummary = z.infer<typeof caseSummarySchema>;
+
+export const caseArtifactSchema = z.object({
+  id: z.string().min(1),
+  caseId: z.string().min(1),
+  type: artifactTypeSchema,
+  filename: z.string().min(1),
+  mimeType: nullableStringSchema.optional(),
+  storageUri: nullableStringSchema.optional(),
+  extractedText: nullableStringSchema.optional(),
+  processingStatus: z.string().min(1),
+  errorMessage: nullableStringSchema.optional(),
+  uploadedAt: nullableIsoDateTimeStringSchema.optional(),
+  processingStartedAt: nullableIsoDateTimeStringSchema.optional(),
+  processingCompletedAt: nullableIsoDateTimeStringSchema.optional(),
+  createdAt: isoDateTimeStringSchema,
+  updatedAt: isoDateTimeStringSchema,
+});
+export type CaseArtifact = z.infer<typeof caseArtifactSchema>;
+
+export const caseExtractionResultSchema = z.object({
+  id: z.string().min(1),
+  caseId: z.string().min(1),
+  fieldsJson: z.record(z.string(), caseFieldValueSchema),
+  confidence: z.number(),
+  provenance: recordOfStringsSchema.nullable().optional(),
+  createdAt: isoDateTimeStringSchema,
+});
+export type CaseExtractionResult = z.infer<typeof caseExtractionResultSchema>;
+
+export const caseOpenQuestionSchema = z.object({
+  id: z.string().min(1),
+  caseId: z.string().min(1),
+  question: z.string().min(1),
+  answer: nullableStringSchema.optional(),
+  status: z.string().min(1),
+  source: z.string().min(1).optional(),
+  createdAt: isoDateTimeStringSchema,
+  updatedAt: isoDateTimeStringSchema,
+});
+export type CaseOpenQuestion = z.infer<typeof caseOpenQuestionSchema>;
+
+export const casePolicyResultSchema = z.object({
+  id: z.string().min(1),
+  caseId: z.string().min(1),
+  passed: z.boolean(),
+  warnings: stringArraySchema,
+  blockingIssues: stringArraySchema,
+  requiresFinanceReview: z.boolean(),
+  duplicateSignals: stringArraySchema,
+  reconciliationFlags: stringArraySchema.optional(),
+  approvalRequirement: z.string().nullable().optional(),
+  createdAt: isoDateTimeStringSchema,
+});
+export type CasePolicyResult = z.infer<typeof casePolicyResultSchema>;
+
+export const caseApprovalTaskSchema = z.object({
+  id: z.string().min(1),
+  caseId: z.string().min(1),
+  approverId: z.string().min(1),
+  status: z.string().min(1),
+  decision: nullableStringSchema.optional(),
+  decisionReason: nullableStringSchema.optional(),
+  dueAt: nullableIsoDateTimeStringSchema.optional(),
+  createdAt: isoDateTimeStringSchema,
+  updatedAt: isoDateTimeStringSchema,
+});
+export type CaseApprovalTask = z.infer<typeof caseApprovalTaskSchema>;
+
+export const caseFinanceReviewItemSchema = z.object({
+  id: z.string().min(1),
+  caseId: z.string().min(1),
+  reviewerId: nullableStringSchema.optional(),
+  outcome: nullableStringSchema.optional(),
+  note: nullableStringSchema.optional(),
+  createdAt: isoDateTimeStringSchema,
+  updatedAt: isoDateTimeStringSchema,
+});
+export type CaseFinanceReviewItem = z.infer<typeof caseFinanceReviewItemSchema>;
+
+export const caseExportRecordSchema = z.object({
+  id: z.string().min(1),
+  caseId: z.string().min(1),
+  status: z.string().min(1),
+  connectorName: z.string().min(1).optional(),
+  errorMessage: nullableStringSchema.optional(),
+  createdAt: isoDateTimeStringSchema,
+  updatedAt: isoDateTimeStringSchema,
+});
+export type CaseExportRecord = z.infer<typeof caseExportRecordSchema>;
+
+export const caseWorkflowTransitionSchema = z.object({
+  id: z.string().min(1),
+  caseId: z.string().min(1),
+  fromStatus: z.enum(caseStatuses),
+  toStatus: z.enum(caseStatuses),
+  actorType: z.enum(actorTypes),
+  actorId: nullableStringSchema.optional(),
+  note: nullableStringSchema.optional(),
+  createdAt: isoDateTimeStringSchema,
+});
+export type CaseWorkflowTransition = z.infer<typeof caseWorkflowTransitionSchema>;
+
+export const caseAuditEventSchema = z.object({
+  id: z.string().min(1),
+  caseId: z.string().min(1),
+  eventType: z.string().min(1),
+  actorType: z.enum(actorTypes),
+  actorId: nullableStringSchema.optional(),
+  payload: recordOfUnknownSchema,
+  createdAt: isoDateTimeStringSchema,
+});
+export type CaseAuditEvent = z.infer<typeof caseAuditEventSchema>;
+
+export const caseTimelineItemSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1),
+  subtitle: z.string().min(1),
+  at: isoDateTimeStringSchema,
+  kind: z.enum(["transition", "audit"]),
+});
+export type CaseTimelineItem = z.infer<typeof caseTimelineItemSchema>;
+
+export const exportReadinessSummarySchema = z.object({
+  ready: z.boolean(),
+  status: z.string().min(1),
+  summary: z.string().min(1),
+});
+export type ExportReadinessSummary = z.infer<typeof exportReadinessSummarySchema>;
+
+export const caseDetailResponseSchema = caseSummarySchema.extend({
+  stage: z.enum(caseStatuses),
+  manualActionRequired: z.boolean(),
+  latestExtraction: caseExtractionResultSchema.nullable(),
+  latestPolicyResult: casePolicyResultSchema.nullable(),
+  latestApprovalTask: caseApprovalTaskSchema.nullable(),
+  latestFinanceReview: caseFinanceReviewItemSchema.nullable(),
+  latestExportRecord: caseExportRecordSchema.nullable(),
+  reasoningSummary: z.string().nullable(),
+  recommendedAction: z.string().nullable(),
+  failureMode: z.string().nullable(),
+  exportReadinessSummary: exportReadinessSummarySchema,
+  artifacts: z.array(caseArtifactSchema),
+  extractionResults: z.array(caseExtractionResultSchema),
+  openQuestions: z.array(caseOpenQuestionSchema),
+  policyResults: z.array(casePolicyResultSchema),
+  approvalTasks: z.array(caseApprovalTaskSchema),
+  financeReviews: z.array(caseFinanceReviewItemSchema),
+  exportRecords: z.array(caseExportRecordSchema),
+  workflowTransitions: z.array(caseWorkflowTransitionSchema),
+  auditEvents: z.array(caseAuditEventSchema),
+});
+export type CaseDetailResponse = z.infer<typeof caseDetailResponseSchema>;
+
+export const approvalQueueItemSchema = caseApprovalTaskSchema.extend({
+  case: caseSummarySchema.pick({
+    id: true,
+    workflowType: true,
+    status: true,
+    priority: true,
+    requesterId: true,
+    createdAt: true,
+    updatedAt: true,
+  }),
+});
+export const approvalQueueResponseSchema = z.array(approvalQueueItemSchema);
+export type ApprovalQueueItem = z.infer<typeof approvalQueueItemSchema>;
+
+export const financeReviewQueueItemSchema = caseFinanceReviewItemSchema.extend({
+  case: caseSummarySchema.pick({
+    id: true,
+    workflowType: true,
+    status: true,
+    priority: true,
+    requesterId: true,
+    createdAt: true,
+    updatedAt: true,
+  }),
+});
+export const financeReviewQueueResponseSchema = z.array(financeReviewQueueItemSchema);
+export type FinanceReviewQueueItem = z.infer<typeof financeReviewQueueItemSchema>;
+
+export const workflowDecisionViewSchema = z.object({
+  recommendedAction: z.string().min(1),
+  reasoningSummary: z.string().min(1),
+  nextState: z.enum(caseStatuses),
+  requiredApproverRole: z.enum(roleTypes).optional(),
+});
+export type WorkflowDecisionView = z.infer<typeof workflowDecisionViewSchema>;
+
+export const aiExtractionViewSchema = z.object({
+  fields: structuredFieldsViewSchema,
+  confidence: z.number(),
+  provenance: recordOfStringsSchema,
+  openQuestions: stringArraySchema,
+});
+export type AiExtractionView = z.infer<typeof aiExtractionViewSchema>;
+
+export const caseSubmissionResponseSchema = z.object({
+  case: caseSummarySchema,
+  aiResult: z.object({
+    extraction: aiExtractionViewSchema,
+    decision: workflowDecisionViewSchema,
+  }),
+  policyResult: casePolicyResultSchema.pick({
+    passed: true,
+    warnings: true,
+    blockingIssues: true,
+    requiresFinanceReview: true,
+    duplicateSignals: true,
+    reconciliationFlags: true,
+    approvalRequirement: true,
+  }).nullable(),
+});
+export type CaseSubmissionResponse = z.infer<typeof caseSubmissionResponseSchema>;
+
+export const createCaseResponseSchema = caseSummarySchema;
+export type CreateCaseResponse = z.infer<typeof createCaseResponseSchema>;

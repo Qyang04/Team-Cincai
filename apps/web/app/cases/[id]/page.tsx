@@ -1,3 +1,8 @@
+import {
+  caseDetailResponseSchema,
+  type CaseDetailResponse,
+  type CaseTimelineItem,
+} from "@finance-ops/shared";
 import Link from "next/link";
 import { ExportActionForm } from "./export-action-form";
 import { QuestionResponseForm } from "./question-response-form";
@@ -5,88 +10,6 @@ import { RefreshButton } from "./refresh-button";
 
 type CaseDetailPageProps = {
   params: Promise<{ id: string }>;
-};
-
-type CaseDetailResponse = {
-  id: string;
-  workflowType: string;
-  status: string;
-  priority: string;
-  requesterId: string;
-  assignedTo?: string | null;
-  createdAt: string;
-  updatedAt: string;
-  artifacts: Array<{
-    id: string;
-    filename: string;
-    processingStatus: string;
-    storageUri?: string | null;
-    errorMessage?: string | null;
-    extractedText?: string | null;
-    uploadedAt?: string | null;
-    processingStartedAt?: string | null;
-    processingCompletedAt?: string | null;
-  }>;
-  extractionResults: Array<{
-    id: string;
-    fieldsJson: Record<string, string | number | null>;
-    confidence: number;
-    provenance?: Record<string, string> | null;
-    createdAt: string;
-  }>;
-  openQuestions: Array<{
-    id: string;
-    question: string;
-    answer?: string | null;
-    status: string;
-    source?: string;
-  }>;
-  policyResults: Array<{
-    id: string;
-    passed: boolean;
-    warnings: string[];
-    blockingIssues: string[];
-    requiresFinanceReview: boolean;
-    duplicateSignals: string[];
-  }>;
-  approvalTasks: Array<{
-    id: string;
-    status: string;
-    approverId: string;
-    decision?: string | null;
-    decisionReason?: string | null;
-    dueAt?: string | null;
-    createdAt: string;
-  }>;
-  financeReviews: Array<{
-    id: string;
-    outcome?: string | null;
-    note?: string | null;
-    reviewerId?: string | null;
-    createdAt: string;
-  }>;
-  exportRecords: Array<{
-    id: string;
-    status: string;
-    errorMessage?: string | null;
-    connectorName?: string;
-    createdAt: string;
-  }>;
-  workflowTransitions: Array<{
-    id: string;
-    fromStatus: string;
-    toStatus: string;
-    actorType: string;
-    actorId?: string | null;
-    note?: string | null;
-    createdAt: string;
-  }>;
-  auditEvents: Array<{
-    id: string;
-    eventType: string;
-    actorType: string;
-    createdAt: string;
-  }>;
 };
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
@@ -162,7 +85,7 @@ async function getCaseDetail(id: string): Promise<CaseDetailResponse | null> {
       return null;
     }
 
-    return response.json();
+    return caseDetailResponseSchema.parse(await response.json());
   } catch {
     return null;
   }
@@ -193,12 +116,12 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
     );
   }
 
-  const latestExtraction = caseDetail.extractionResults[0];
-  const latestPolicy = caseDetail.policyResults[0];
-  const latestExport = caseDetail.exportRecords[0];
+  const latestExtraction = caseDetail.latestExtraction;
+  const latestPolicy = caseDetail.latestPolicyResult;
+  const latestExport = caseDetail.latestExportRecord;
   const extractedEntries = latestExtraction ? Object.entries(latestExtraction.fieldsJson) : [];
   const provenance = (latestExtraction?.provenance ?? {}) as Record<string, string>;
-  const stage = statusMeta[caseDetail.status];
+  const stage = statusMeta[caseDetail.stage] ?? statusMeta[caseDetail.status];
   const unansweredQuestions = caseDetail.openQuestions.filter((question) => question.status !== "ANSWERED");
   const timeline = buildTimeline(caseDetail);
 
@@ -233,16 +156,17 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
             <p className="eyebrow">Copilot posture</p>
             <h2>{stage?.label ?? caseDetail.status}</h2>
             <p className="muted">
-              {unansweredQuestions.length
-                ? `The requester has ${unansweredQuestions.length} open question${unansweredQuestions.length === 1 ? "" : "s"} to answer before the case can progress.`
-                : latestPolicy?.requiresFinanceReview
-                ? "Policy indicates finance review is required before the case can continue."
-                : latestPolicy?.blockingIssues.length
-                ? "Policy produced blocking issues that must be resolved."
-                : "The workflow is on a recoverable path with visible extraction, review, and export state."}
+              {caseDetail.reasoningSummary ??
+                (unansweredQuestions.length
+                  ? `The requester has ${unansweredQuestions.length} open question${unansweredQuestions.length === 1 ? "" : "s"} to answer before the case can progress.`
+                  : latestPolicy?.requiresFinanceReview
+                    ? "Policy indicates finance review is required before the case can continue."
+                    : latestPolicy?.blockingIssues.length
+                      ? "Policy produced blocking issues that must be resolved."
+                      : "The workflow is on a recoverable path with visible extraction, review, and export state.")}
             </p>
             <p className="muted">
-              Created {new Date(caseDetail.createdAt).toLocaleString()} · Updated{" "}
+              Created {new Date(caseDetail.createdAt).toLocaleString()} - Updated{" "}
               {new Date(caseDetail.updatedAt).toLocaleString()}
             </p>
           </article>
@@ -462,7 +386,7 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
               {latestPolicy.duplicateSignals.length ? (
                 <>
                   <p className="detail-label" style={{ marginTop: 16 }}>
-                    Duplicate & fraud signals
+                    Duplicate and fraud signals
                   </p>
                   <ul className="muted clean-list">
                     {latestPolicy.duplicateSignals.map((signal) => (
@@ -549,8 +473,9 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
               </div>
             </div>
           ) : (
-            <p className="muted">No export record yet.</p>
+            <p className="muted">{caseDetail.exportReadinessSummary.summary}</p>
           )}
+          {caseDetail.failureMode ? <p className="text-danger">Failure mode: {caseDetail.failureMode}</p> : null}
           {caseDetail.status === "EXPORT_READY" ? <ExportActionForm caseId={caseDetail.id} /> : null}
         </article>
       </section>
@@ -558,30 +483,25 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
   );
 }
 
-type TimelineEntry = {
-  id: string;
-  title: string;
-  subtitle: string;
-  at: string;
-};
-
-function buildTimeline(caseDetail: CaseDetailResponse): TimelineEntry[] {
-  const transitionEntries: TimelineEntry[] = caseDetail.workflowTransitions.map((transition) => ({
+function buildTimeline(caseDetail: CaseDetailResponse): CaseTimelineItem[] {
+  const transitionEntries: CaseTimelineItem[] = caseDetail.workflowTransitions.map((transition) => ({
     id: `transition-${transition.id}`,
-    title: `${statusMeta[transition.fromStatus]?.label ?? transition.fromStatus} → ${
+    title: `${statusMeta[transition.fromStatus]?.label ?? transition.fromStatus} -> ${
       statusMeta[transition.toStatus]?.label ?? transition.toStatus
     }`,
     subtitle: transition.note
       ? `${transition.actorType.toLowerCase()}: ${transition.note}`
       : `by ${transition.actorType.toLowerCase()}${transition.actorId ? ` (${transition.actorId})` : ""}`,
     at: transition.createdAt,
+    kind: "transition",
   }));
 
-  const auditEntries: TimelineEntry[] = caseDetail.auditEvents.map((event) => ({
+  const auditEntries: CaseTimelineItem[] = caseDetail.auditEvents.map((event) => ({
     id: `audit-${event.id}`,
     title: humanizeKey(event.eventType),
     subtitle: `Recorded by ${event.actorType.toLowerCase()}`,
     at: event.createdAt,
+    kind: "audit",
   }));
 
   return [...transitionEntries, ...auditEntries].sort(

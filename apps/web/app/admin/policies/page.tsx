@@ -1,3 +1,11 @@
+import {
+  adminConnectorsResponseSchema,
+  adminPolicyConfigSchema,
+  adminRoutingConfigSchema,
+  type AdminConnectorStatus,
+  type AdminPolicyConfig,
+  type AdminRoutingConfig,
+} from "@finance-ops/shared";
 import { PolicyAdminForm } from "./policy-admin-form";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
@@ -6,7 +14,28 @@ const adminHeaders = {
   "x-mock-user-id": "admin.user",
 };
 
-async function getAdminData() {
+const fallbackPolicy: AdminPolicyConfig = {
+  managerApprovalThreshold: 500,
+  requireProjectCodeWorkflows: [
+    "EXPENSE_CLAIM",
+    "PETTY_CASH_REIMBURSEMENT",
+    "INTERNAL_PAYMENT_REQUEST",
+  ],
+  duplicateFilenameDetection: true,
+  invoiceNumberRequiredForVendorInvoices: true,
+};
+
+const fallbackRouting: AdminRoutingConfig = {
+  defaultApproverId: "manager.approver",
+  financeReviewerId: "finance.reviewer",
+  escalationWindowHours: 24,
+};
+
+async function getAdminData(): Promise<{
+  policy: AdminPolicyConfig;
+  routing: AdminRoutingConfig;
+  connectors: AdminConnectorStatus[];
+}> {
   const [policyResponse, routingResponse, connectorsResponse] = await Promise.all([
     fetch(`${apiBaseUrl}/admin/policies`, { cache: "no-store", headers: adminHeaders }),
     fetch(`${apiBaseUrl}/admin/routing`, { cache: "no-store", headers: adminHeaders }),
@@ -14,22 +43,13 @@ async function getAdminData() {
   ]);
 
   return {
-    policy: policyResponse.ok
-      ? await policyResponse.json()
-      : {
-          managerApprovalThreshold: 500,
-          requireProjectCodeWorkflows: ["EXPENSE_CLAIM", "PETTY_CASH_REIMBURSEMENT", "INTERNAL_PAYMENT_REQUEST"],
-          duplicateFilenameDetection: true,
-          invoiceNumberRequiredForVendorInvoices: true,
-        },
+    policy: policyResponse.ok ? adminPolicyConfigSchema.parse(await policyResponse.json()) : fallbackPolicy,
     routing: routingResponse.ok
-      ? await routingResponse.json()
-      : {
-          defaultApproverId: "manager.approver",
-          financeReviewerId: "finance.reviewer",
-          escalationWindowHours: 24,
-        },
-    connectors: connectorsResponse.ok ? await connectorsResponse.json() : [],
+      ? adminRoutingConfigSchema.parse(await routingResponse.json())
+      : fallbackRouting,
+    connectors: connectorsResponse.ok
+      ? adminConnectorsResponseSchema.parse(await connectorsResponse.json())
+      : [],
   };
 }
 
@@ -68,7 +88,7 @@ export default async function AdminPoliciesPage() {
 
           <section className="connector-grid">
             {data.connectors.length ? (
-              data.connectors.map((connector: { connector: string; status: string; detail: string }) => (
+              data.connectors.map((connector) => (
                 <article key={connector.connector} className="connector-card">
                   <p className="eyebrow">{connector.status}</p>
                   <h2>{connector.connector}</h2>

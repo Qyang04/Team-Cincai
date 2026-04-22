@@ -1,26 +1,10 @@
+import { financeReviewQueueResponseSchema, type FinanceReviewQueueItem } from "@finance-ops/shared";
 import Link from "next/link";
 import { FinanceReviewActionForm } from "./finance-review-action-form";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
 
-type FinanceReview = {
-  id: string;
-  note?: string | null;
-  outcome?: string | null;
-  reviewerId?: string | null;
-  createdAt: string;
-  updatedAt: string;
-  case: {
-    id: string;
-    workflowType: string;
-    status: string;
-    priority: string;
-    requesterId: string;
-    createdAt: string;
-  };
-};
-
-async function getFinanceReviewCases(): Promise<FinanceReview[]> {
+async function getFinanceReviewCases(): Promise<FinanceReviewQueueItem[]> {
   try {
     const response = await fetch(`${apiBaseUrl}/cases/finance-review/cases`, {
       cache: "no-store",
@@ -32,7 +16,7 @@ async function getFinanceReviewCases(): Promise<FinanceReview[]> {
     if (!response.ok) {
       return [];
     }
-    return response.json();
+    return financeReviewQueueResponseSchema.parse(await response.json());
   } catch {
     return [];
   }
@@ -75,8 +59,7 @@ export default async function FinanceReviewPage() {
                   <p className="eyebrow">Case {review.case.id}</p>
                   <h2>{humanizeWorkflow(review.case.workflowType)}</h2>
                   <p className="muted">
-                    Requested by {review.case.requesterId} · opened{" "}
-                    {new Date(review.case.createdAt).toLocaleString()}
+                    Requested by {review.case.requesterId} - opened {new Date(review.case.createdAt).toLocaleString()}
                   </p>
                 </div>
                 <div className="stack-list" style={{ justifyItems: "end" }}>

@@ -1,10 +1,11 @@
 "use client";
 
+import type { CaseSubmissionResponse, CreateCaseResponse, WorkflowType } from "@finance-ops/shared";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition, type ClipboardEvent, type DragEvent } from "react";
 
-const workflowOptions = [
+const workflowOptions: ReadonlyArray<{ value: WorkflowType; label: string }> = [
   { value: "EXPENSE_CLAIM", label: "Expense claim" },
   { value: "PETTY_CASH_REIMBURSEMENT", label: "Petty cash reimbursement" },
   { value: "VENDOR_INVOICE_APPROVAL", label: "Vendor invoice approval" },
@@ -13,39 +14,9 @@ const workflowOptions = [
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
 
-type ExtractionPayload = {
-  fields: Record<string, string | number | null | undefined>;
-  confidence: number;
-  provenance: Record<string, string>;
-  openQuestions: string[];
-};
-
-type DecisionPayload = {
-  recommendedAction: string;
-  reasoningSummary: string;
-  nextState: string;
-  requiredApproverRole?: string;
-};
-
-type PolicyPayload = {
-  passed: boolean;
-  warnings: string[];
-  blockingIssues: string[];
-  requiresFinanceReview: boolean;
-  duplicateSignals: string[];
-};
-
-type SubmissionSuccess = {
-  caseId: string;
-  status: string;
-  extraction: ExtractionPayload;
-  decision: DecisionPayload;
-  policyResult: PolicyPayload | null;
-};
-
 type SubmissionState =
   | { kind: "idle" }
-  | { kind: "success"; data: SubmissionSuccess }
+  | { kind: "success"; data: CaseSubmissionResponse }
   | { kind: "error"; error: string };
 
 const defaultFilenames = ["lunch-receipt.jpg", "parking-receipt.jpg"];
@@ -129,7 +100,7 @@ export function CaseForm() {
           throw new Error(`Failed to create case (${createResponse.status}).`);
         }
 
-        const created = await createResponse.json();
+        const created = (await createResponse.json()) as CreateCaseResponse;
         const submitResponse = await fetch(`${apiBaseUrl}/cases/${created.id}/submit`, {
           method: "POST",
           headers: {
@@ -144,17 +115,9 @@ export function CaseForm() {
           throw new Error(`Failed to submit case (${submitResponse.status}).`);
         }
 
-        const submitted = await submitResponse.json();
-
         setState({
           kind: "success",
-          data: {
-            caseId: submitted.case.id,
-            status: submitted.case.status,
-            extraction: submitted.aiResult.extraction,
-            decision: submitted.aiResult.decision,
-            policyResult: submitted.policyResult ?? null,
-          },
+          data: (await submitResponse.json()) as CaseSubmissionResponse,
         });
       } catch (error) {
         setState({
@@ -199,7 +162,7 @@ export function CaseForm() {
             <strong>Stage the evidence for this request</strong>
             <p className="muted">
               Click to pick files, drag and drop them here, or paste (Ctrl+V) a copied file or screenshot. Only the
-              filenames are sent to the backend — the mock storage layer records them as artifacts.
+              filenames are sent to the backend - the mock storage layer records them as artifacts.
             </p>
           </div>
           <input
@@ -238,7 +201,7 @@ export function CaseForm() {
                       padding: 0,
                     }}
                   >
-                    ×
+                    x
                   </button>
                 </span>
               ))}
@@ -299,7 +262,7 @@ export function CaseForm() {
               )
             }
             className="field-control field-control-mono"
-            placeholder="one filename per line — or drop / paste files above"
+            placeholder="one filename per line - or drop / paste files above"
             suppressHydrationWarning
           />
         </label>
@@ -343,11 +306,11 @@ export function CaseForm() {
   );
 }
 
-function SubmissionSummary({ data }: { data: SubmissionSuccess }) {
-  const extractionEntries = Object.entries(data.extraction.fields ?? {}).filter(
+function SubmissionSummary({ data }: { data: CaseSubmissionResponse }) {
+  const extractionEntries = Object.entries(data.aiResult.extraction.fields ?? {}).filter(
     ([, value]) => value !== undefined && value !== null && value !== "",
   );
-  const confidencePct = Math.round((data.extraction.confidence ?? 0) * 100);
+  const confidencePct = Math.round((data.aiResult.extraction.confidence ?? 0) * 100);
   const policy = data.policyResult;
 
   return (
@@ -356,10 +319,10 @@ function SubmissionSummary({ data }: { data: SubmissionSuccess }) {
         <div>
           <strong>Case created and intake complete</strong>
           <p className="muted">
-            Case <code>{data.caseId}</code> is now in <strong>{data.status}</strong>.
+            Case <code>{data.case.id}</code> is now in <strong>{data.case.status}</strong>.
           </p>
         </div>
-        <Link className="button-primary" href={`/cases/${data.caseId}`}>
+        <Link className="button-primary" href={`/cases/${data.case.id}`}>
           Open case detail
         </Link>
       </div>
@@ -367,7 +330,7 @@ function SubmissionSummary({ data }: { data: SubmissionSuccess }) {
       <div className="detail-grid" style={{ marginTop: 16 }}>
         <div>
           <p className="detail-label">Next step</p>
-          <p>{data.decision.recommendedAction}</p>
+          <p>{data.aiResult.decision.recommendedAction}</p>
         </div>
         <div>
           <p className="detail-label">Confidence</p>
@@ -375,17 +338,17 @@ function SubmissionSummary({ data }: { data: SubmissionSuccess }) {
         </div>
         <div>
           <p className="detail-label">Required approver</p>
-          <p>{data.decision.requiredApproverRole ?? "Not yet assigned"}</p>
+          <p>{data.aiResult.decision.requiredApproverRole ?? "Not yet assigned"}</p>
         </div>
         <div>
           <p className="detail-label">Open questions</p>
-          <p>{data.extraction.openQuestions?.length ?? 0}</p>
+          <p>{data.aiResult.extraction.openQuestions?.length ?? 0}</p>
         </div>
       </div>
 
-      {data.decision.reasoningSummary ? (
+      {data.aiResult.decision.reasoningSummary ? (
         <p className="muted" style={{ marginTop: 12 }}>
-          {data.decision.reasoningSummary}
+          {data.aiResult.decision.reasoningSummary}
         </p>
       ) : null}
 
@@ -405,13 +368,13 @@ function SubmissionSummary({ data }: { data: SubmissionSuccess }) {
         </>
       ) : null}
 
-      {data.extraction.openQuestions?.length ? (
+      {data.aiResult.extraction.openQuestions?.length ? (
         <>
           <p className="detail-label" style={{ marginTop: 16 }}>
             Clarifications the AI will ask the requester
           </p>
           <ul className="muted clean-list">
-            {data.extraction.openQuestions.map((question) => (
+            {data.aiResult.extraction.openQuestions.map((question) => (
               <li key={question}>{question}</li>
             ))}
           </ul>

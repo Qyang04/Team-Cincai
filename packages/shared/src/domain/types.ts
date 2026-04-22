@@ -10,6 +10,19 @@ export type StructuredFields = {
   costCenter?: string;
   vendorName?: string;
   projectCode?: string;
+  originalAmount?: number;
+  originalCurrency?: string;
+  baseCurrency?: string;
+  estimatedFxRate?: number;
+  estimatedBaseAmount?: number;
+  realizedBaseAmount?: number;
+  realizedFxSource?: string;
+  netAmount?: number;
+  taxAmount?: number;
+  grossAmount?: number;
+  vendorTaxId?: string;
+  amountDiscrepancyFlag?: boolean;
+  taxMismatchFlag?: boolean;
 };
 
 export type ExtractionResult = {
@@ -25,6 +38,8 @@ export type PolicyCheckResult = {
   blockingIssues: string[];
   requiresFinanceReview: boolean;
   duplicateSignals: string[];
+  reconciliationFlags?: string[];
+  approvalRequirement?: string | null;
 };
 
 export type WorkflowDecision = {
@@ -54,4 +69,3 @@ export type AuditEvent = {
   payload: Record<string, unknown>;
   timestamp: string;
 };
-

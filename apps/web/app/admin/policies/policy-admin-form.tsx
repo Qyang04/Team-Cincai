@@ -1,21 +1,19 @@
 "use client";
 
+import {
+  adminPolicyConfigSchema,
+  adminRoutingConfigSchema,
+  normalizeWorkflowTypeIdentifier,
+  type AdminPolicyConfig,
+  type AdminRoutingConfig,
+} from "@finance-ops/shared";
 import { useState, useTransition } from "react";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
 
 type PolicyAdminFormProps = {
-  initialPolicy: {
-    managerApprovalThreshold: number;
-    requireProjectCodeWorkflows: string[];
-    duplicateFilenameDetection: boolean;
-    invoiceNumberRequiredForVendorInvoices: boolean;
-  };
-  initialRouting: {
-    defaultApproverId: string;
-    financeReviewerId: string;
-    escalationWindowHours: number;
-  };
+  initialPolicy: AdminPolicyConfig;
+  initialRouting: AdminRoutingConfig;
 };
 
 export function PolicyAdminForm({ initialPolicy, initialRouting }: PolicyAdminFormProps) {
@@ -25,24 +23,30 @@ export function PolicyAdminForm({ initialPolicy, initialRouting }: PolicyAdminFo
   function handleSubmit(formData: FormData) {
     setMessage(null);
 
-    const policyPayload = {
-      managerApprovalThreshold: Number(formData.get("managerApprovalThreshold") ?? initialPolicy.managerApprovalThreshold),
-      requireProjectCodeWorkflows: String(formData.get("requireProjectCodeWorkflows") ?? "")
-        .split(",")
-        .map((item) => item.trim())
-        .filter(Boolean),
-      duplicateFilenameDetection: formData.get("duplicateFilenameDetection") === "on",
-      invoiceNumberRequiredForVendorInvoices: formData.get("invoiceNumberRequiredForVendorInvoices") === "on",
-    };
-
-    const routingPayload = {
-      defaultApproverId: String(formData.get("defaultApproverId") ?? initialRouting.defaultApproverId),
-      financeReviewerId: String(formData.get("financeReviewerId") ?? initialRouting.financeReviewerId),
-      escalationWindowHours: Number(formData.get("escalationWindowHours") ?? initialRouting.escalationWindowHours),
-    };
-
     startTransition(async () => {
       try {
+        const policyPayload = adminPolicyConfigSchema.parse({
+          managerApprovalThreshold: Number(
+            formData.get("managerApprovalThreshold") ?? initialPolicy.managerApprovalThreshold,
+          ),
+          requireProjectCodeWorkflows: String(formData.get("requireProjectCodeWorkflows") ?? "")
+            .split(",")
+            .map((item) => item.trim())
+            .filter(Boolean)
+            .map((item) => normalizeWorkflowTypeIdentifier(item)),
+          duplicateFilenameDetection: formData.get("duplicateFilenameDetection") === "on",
+          invoiceNumberRequiredForVendorInvoices:
+            formData.get("invoiceNumberRequiredForVendorInvoices") === "on",
+        });
+
+        const routingPayload = adminRoutingConfigSchema.parse({
+          defaultApproverId: String(formData.get("defaultApproverId") ?? initialRouting.defaultApproverId),
+          financeReviewerId: String(formData.get("financeReviewerId") ?? initialRouting.financeReviewerId),
+          escalationWindowHours: Number(
+            formData.get("escalationWindowHours") ?? initialRouting.escalationWindowHours,
+          ),
+        });
+
         const headers = {
           "Content-Type": "application/json",
           "x-mock-role": "ADMIN",

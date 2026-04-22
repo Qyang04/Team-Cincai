@@ -1,27 +1,10 @@
+import { approvalQueueResponseSchema, type ApprovalQueueItem } from "@finance-ops/shared";
 import Link from "next/link";
 import { ApprovalActionForm } from "./approval-action-form";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
 
-type ApprovalTask = {
-  id: string;
-  approverId: string;
-  status: string;
-  decision?: string | null;
-  decisionReason?: string | null;
-  dueAt?: string | null;
-  createdAt: string;
-  case: {
-    id: string;
-    workflowType: string;
-    status: string;
-    priority: string;
-    requesterId: string;
-    createdAt: string;
-  };
-};
-
-async function getApprovalTasks(): Promise<ApprovalTask[]> {
+async function getApprovalTasks(): Promise<ApprovalQueueItem[]> {
   try {
     const response = await fetch(`${apiBaseUrl}/cases/approvals/tasks`, {
       cache: "no-store",
@@ -33,7 +16,7 @@ async function getApprovalTasks(): Promise<ApprovalTask[]> {
     if (!response.ok) {
       return [];
     }
-    return response.json();
+    return approvalQueueResponseSchema.parse(await response.json());
   } catch {
     return [];
   }
@@ -87,7 +70,7 @@ export default async function ApprovalsPage() {
                   <p className="eyebrow">Case {task.case.id}</p>
                   <h2>{humanizeWorkflow(task.case.workflowType)}</h2>
                   <p className="muted">
-                    Requested by {task.case.requesterId} · opened {formatRelative(task.case.createdAt)}
+                    Requested by {task.case.requesterId} - opened {formatRelative(task.case.createdAt)}
                   </p>
                 </div>
                 <div className="stack-list" style={{ justifyItems: "end" }}>

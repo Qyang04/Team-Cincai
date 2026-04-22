@@ -7,3 +7,4 @@ require("../apps/api/src/modules/workflow-orchestrator.service.spec.ts");
 require("../apps/api/src/modules/case-detail.service.spec.ts");
 require("../apps/api/src/modules/finance-review.service.spec.ts");
 require("../packages/shared/src/domain/workflow.spec.ts");
+require("../packages/shared/src/contracts/api.spec.ts");
