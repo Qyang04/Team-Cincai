@@ -113,7 +113,7 @@ export class WorkflowOrchestratorService {
     });
 
     await Promise.all(
-      createdArtifacts.map((artifact) =>
+      createdArtifacts.map((artifact: { id: string; storageUri?: string | null }) =>
         this.processArtifactUpload(caseId, artifact.id, artifact.storageUri ?? undefined),
       ),
     );

@@ -3,6 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "prisma:generate": "prisma generate --schema prisma/schema.prisma",
+    "postinstall": "npm run prisma:generate",
     "start:dev": "node --watch --require ts-node/register --require tsconfig-paths/register src/main.ts",
     "build": "nest build",
     "lint": "eslint \"src/**/*.ts\"",
@@ -16,6 +18,7 @@
     "@nestjs/platform-express": "^11.0.0",
     "@prisma/client": "^6.6.0",
     "bullmq": "^5.56.1",
+    "dotenv": "^16.6.1",
     "ioredis": "^5.8.1",
     "openai": "^4.104.0",
     "reflect-metadata": "^0.2.2",

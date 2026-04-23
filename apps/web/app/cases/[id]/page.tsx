@@ -1,9 +1,11 @@
 import {
+  DEFAULT_API_BASE_URL,
   caseDetailResponseSchema,
   type CaseDetailResponse,
   type CaseTimelineItem,
 } from "@finance-ops/shared";
 import Link from "next/link";
+import { fetchApiJson } from "../../lib/server-api";
 import { ExportActionForm } from "./export-action-form";
 import { QuestionResponseForm } from "./question-response-form";
 import { RefreshButton } from "./refresh-button";
@@ -12,7 +14,7 @@ type CaseDetailPageProps = {
   params: Promise<{ id: string }>;
 };
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
 
 const statusMeta: Record<
   string,
@@ -75,35 +77,39 @@ function statusChipClass(status: string): string {
   return `inline-status inline-status-${variant}`;
 }
 
-async function getCaseDetail(id: string): Promise<CaseDetailResponse | null> {
-  try {
-    const response = await fetch(`${apiBaseUrl}/cases/${id}`, {
+async function getCaseDetail(
+  id: string,
+): Promise<{ caseDetail: CaseDetailResponse | null; errorMessage: string | null; isMissing: boolean }> {
+  const result = await fetchApiJson<CaseDetailResponse | null>({
+    url: `${apiBaseUrl}/cases/${id}`,
+    init: {
       cache: "no-store",
-    });
+    },
+    fallbackData: null,
+    resourceLabel: `Case ${id}`,
+    parse: (value) => caseDetailResponseSchema.parse(value),
+  });
 
-    if (!response.ok) {
-      return null;
-    }
-
-    return caseDetailResponseSchema.parse(await response.json());
-  } catch {
-    return null;
-  }
+  return {
+    caseDetail: result.data,
+    errorMessage: result.ok ? null : result.message,
+    isMissing: !result.ok && result.status === 404,
+  };
 }
 
 export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
   const { id } = await params;
-  const caseDetail = await getCaseDetail(id);
+  const { caseDetail, errorMessage, isMissing } = await getCaseDetail(id);
 
   if (!caseDetail) {
     return (
       <section className="empty-state">
         <div>
           <p className="eyebrow">Case detail</p>
-          <h2>Case not available</h2>
+          <h2>{isMissing ? "Case not found" : "Case detail failed to load"}</h2>
           <p className="muted">
-            The API could not return this case. Start the backend and submit a case from the intake form to populate
-            live detail data.
+            {errorMessage ??
+              "The API could not return this case. Start the backend and submit a case from the intake form to populate live detail data."}
           </p>
           <p className="muted">
             Looked for <code>{id}</code> at <code>{apiBaseUrl}</code>.

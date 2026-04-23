@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  DEFAULT_API_BASE_URL,
   caseSubmissionResponseSchema,
   createCaseResponseSchema,
   type CaseSubmissionResponse,
@@ -17,7 +18,7 @@ const workflowOptions: ReadonlyArray<{ value: WorkflowType; label: string }> = [
   { value: "INTERNAL_PAYMENT_REQUEST", label: "Internal payment request" },
 ] as const;
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
 
 type SubmissionState =
   | { kind: "idle" }

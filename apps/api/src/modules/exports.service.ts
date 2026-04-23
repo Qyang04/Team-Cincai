@@ -53,7 +53,9 @@ export class ExportsService {
       data: { status: "EXPORTING", errorMessage: null },
     });
 
-    const shouldFail = caseRecord?.artifacts.some((artifact) => artifact.filename.toLowerCase().includes("fail-export"));
+    const shouldFail = caseRecord?.artifacts.some((artifact: { filename: string }) =>
+      artifact.filename.toLowerCase().includes("fail-export"),
+    );
 
     if (shouldFail) {
       return this.prisma.exportRecord.update({

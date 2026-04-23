@@ -1,10 +1,10 @@
 "use client";
 
-import { questionResponseActionResponseSchema } from "@finance-ops/shared";
+import { DEFAULT_API_BASE_URL, questionResponseActionResponseSchema } from "@finance-ops/shared";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
 
 type QuestionResponseFormProps = {
   caseId: string;

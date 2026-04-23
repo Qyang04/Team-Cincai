@@ -1,5 +1,4 @@
 import { Injectable } from "@nestjs/common";
-import type { Prisma } from "@prisma/client";
 import { PrismaService } from "./prisma.service";
 
 @Injectable()
@@ -44,7 +43,7 @@ export class ArtifactsService {
   }
 
   async markUploaded(artifactId: string, storageUri?: string) {
-    const data: Prisma.ArtifactUpdateInput = {
+    const data = {
       storageUri: storageUri ?? undefined,
       processingStatus: "UPLOADED",
       uploadedAt: new Date(),
@@ -58,7 +57,7 @@ export class ArtifactsService {
   }
 
   async markProcessing(artifactId: string) {
-    const data: Prisma.ArtifactUpdateInput = {
+    const data = {
       processingStatus: "PROCESSING",
       processingStartedAt: new Date(),
       errorMessage: null,
@@ -71,7 +70,7 @@ export class ArtifactsService {
   }
 
   async markProcessed(artifactId: string, extractedText: string) {
-    const data: Prisma.ArtifactUpdateInput = {
+    const data = {
       processingStatus: "PROCESSED",
       extractedText,
       processingCompletedAt: new Date(),
@@ -85,7 +84,7 @@ export class ArtifactsService {
   }
 
   async markFailed(artifactId: string, errorMessage: string) {
-    const data: Prisma.ArtifactUpdateInput = {
+    const data = {
       processingStatus: "FAILED",
       processingCompletedAt: new Date(),
       errorMessage,

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  DEFAULT_API_BASE_URL,
   adminPolicyConfigSchema,
   adminRoutingConfigSchema,
   normalizeWorkflowTypeIdentifier,
@@ -9,7 +10,7 @@ import {
 } from "@finance-ops/shared";
 import { useState, useTransition } from "react";
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
 
 type PolicyAdminFormProps = {
   initialPolicy: AdminPolicyConfig;
@@ -17,7 +18,7 @@ type PolicyAdminFormProps = {
 };
 
 export function PolicyAdminForm({ initialPolicy, initialRouting }: PolicyAdminFormProps) {
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ text: string; tone: "success" | "error" } | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function handleSubmit(formData: FormData) {
@@ -70,9 +71,15 @@ export function PolicyAdminForm({ initialPolicy, initialRouting }: PolicyAdminFo
           throw new Error("Failed to save admin settings.");
         }
 
-        setMessage("Settings saved. Refresh to confirm the updated values.");
+        setMessage({
+          text: "Settings saved. Refresh the page to confirm the latest persisted values.",
+          tone: "success",
+        });
       } catch (error) {
-        setMessage(error instanceof Error ? error.message : "Unexpected settings error.");
+        setMessage({
+          text: error instanceof Error ? error.message : "Unexpected settings error.",
+          tone: "error",
+        });
       }
     });
   }
@@ -92,7 +99,7 @@ export function PolicyAdminForm({ initialPolicy, initialRouting }: PolicyAdminFo
       <section className="form-section">
         <div>
           <p className="eyebrow">Approval thresholds</p>
-          <p className="muted">Set financial limits and workflow rules for automated versus manual review.</p>
+          <p className="muted">Set the current handoff thresholds used by policy and routing.</p>
         </div>
         <div className="field-grid">
           <label className="field">
@@ -119,7 +126,7 @@ export function PolicyAdminForm({ initialPolicy, initialRouting }: PolicyAdminFo
       <section className="form-section">
         <div>
           <p className="eyebrow">Routing defaults</p>
-          <p className="muted">Keep the default approver and finance reviewer aligned with current operating ownership.</p>
+          <p className="muted">Keep the default approver and finance reviewer aligned with current ownership.</p>
         </div>
         <div className="field-grid">
           <label className="field">
@@ -136,10 +143,10 @@ export function PolicyAdminForm({ initialPolicy, initialRouting }: PolicyAdminFo
       <section className="form-section">
         <div>
           <p className="eyebrow">Workflow configuration</p>
-          <p className="muted">These settings shape how incomplete or duplicate evidence is handled during intake.</p>
+          <p className="muted">These settings affect how incomplete or duplicate evidence is handled during intake.</p>
         </div>
         <label className="field">
-          <span className="field-label">Require project code workflows</span>
+          <span className="field-label">Workflows requiring project code</span>
           <input
             name="requireProjectCodeWorkflows"
             defaultValue={initialPolicy.requireProjectCodeWorkflows.join(", ")}
@@ -168,7 +175,11 @@ export function PolicyAdminForm({ initialPolicy, initialRouting }: PolicyAdminFo
         </div>
       </section>
 
-      {message ? <p className="muted">{message}</p> : null}
+      {message ? (
+        <div className={`notice ${message.tone === "success" ? "notice-success" : "notice-error"}`}>
+          <p className="muted">{message.text}</p>
+        </div>
+      ) : null}
     </form>
   );
 }

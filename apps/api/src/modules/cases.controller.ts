@@ -219,7 +219,7 @@ export class CasesController {
     const answered = await this.intakeService.answerQuestion(id, questionId, input.answer);
     const caseRecord = await this.casesService.getCase(id);
     const allQuestionsAnswered = caseRecord?.openQuestions.every(
-      (question) => question.status === "ANSWERED",
+      (question: { status: string }) => question.status === "ANSWERED",
     );
 
     await this.auditService.recordEvent({

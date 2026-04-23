@@ -1,46 +1,147 @@
-const metrics = [
-  { label: "Open cases", value: "24", tone: "metric-neutral", note: "Across all active workflow lanes" },
-  { label: "Awaiting approval", value: "7", tone: "metric-attention", note: "2 require immediate action" },
-  { label: "Finance review", value: "3", tone: "metric-warning", note: "Threshold or anomaly escalation" },
-  { label: "Recoverable exceptions", value: "1", tone: "metric-critical", note: "Retry path available" },
-] as const;
+import { DEFAULT_API_BASE_URL } from "@finance-ops/shared";
+import Link from "next/link";
+import { fetchApiJson } from "../lib/server-api";
 
-const chartBars = [
-  { day: "Mon", height: 84, soft: false },
-  { day: "Tue", height: 52, soft: false },
-  { day: "Wed", height: 106, soft: false },
-  { day: "Thu", height: 38, soft: false },
-  { day: "Fri", height: 106, soft: true },
-  { day: "Sat", height: 24, soft: false },
-  { day: "Sun", height: 30, soft: false },
-] as const;
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
+const dashboardHeaders = {
+  "x-mock-role": "ADMIN",
+  "x-mock-user-id": "admin.user",
+};
 
-const workflowSignals = [
-  { title: "Payroll processing", progress: "82%", note: "Processing 142 records" },
-  { title: "Tax compliance audit", progress: "35%", note: "3 missing files require action" },
-  { title: "Vendor onboarding", progress: "100%", note: "Completed 2h ago" },
-] as const;
+type CaseListItem = {
+  id: string;
+  workflowType: string;
+  status: string;
+  priority: string;
+  requesterId: string;
+  createdAt: string;
+  artifacts?: Array<{ id: string }>;
+};
 
-const transactions = [
-  { entity: "Amazon Web Services", category: "Cloud infrastructure", date: "Sep 24, 2024", status: "Healthy", amount: "-$4,290.00" },
-  { entity: "Marcus Chen", category: "Contractor", date: "Sep 22, 2024", status: "Requires action", amount: "-$2,800.00" },
-  { entity: "Global Logistics Inc.", category: "Shipping", date: "Sep 21, 2024", status: "Processing", amount: "-$1,150.00" },
-] as const;
+async function getCases(): Promise<{ cases: CaseListItem[]; isLive: boolean; errorMessage: string | null }> {
+  const result = await fetchApiJson<CaseListItem[]>({
+    url: `${apiBaseUrl}/cases`,
+    init: {
+      cache: "no-store",
+      headers: dashboardHeaders,
+    },
+    fallbackData: [],
+    resourceLabel: "Case list",
+  });
 
-export default function DashboardPage() {
+  return {
+    cases: result.data,
+    isLive: result.ok,
+    errorMessage: result.ok ? null : result.message,
+  };
+}
+
+function humanizeValue(value: string): string {
+  return value
+    .replace(/_/g, " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatRelative(dateString: string): string {
+  const diffMs = Date.now() - new Date(dateString).getTime();
+  const diffHours = Math.round(diffMs / (1000 * 60 * 60));
+
+  if (Math.abs(diffHours) < 1) {
+    return "just now";
+  }
+
+  if (diffHours < 24) {
+    return `${diffHours}h ago`;
+  }
+
+  const diffDays = Math.round(diffHours / 24);
+  return `${diffDays}d ago`;
+}
+
+export default async function DashboardPage() {
+  const { cases, isLive, errorMessage } = await getCases();
+  const openCases = cases.filter((item) => item.status !== "CLOSED").length;
+  const awaitingApproval = cases.filter(
+    (item) => item.status === "AWAITING_APPROVAL" || item.status === "AWAITING_APPROVER_INFO_RESPONSE",
+  ).length;
+  const financeReview = cases.filter((item) => item.status === "FINANCE_REVIEW").length;
+  const recoverableExceptions = cases.filter((item) => item.status === "RECOVERABLE_EXCEPTION").length;
+  const exportReady = cases.filter((item) => item.status === "EXPORT_READY").length;
+  const awaitingRequesterInfo = cases.filter((item) => item.status === "AWAITING_REQUESTER_INFO").length;
+  const statusCounts = Object.entries(
+    cases.reduce<Record<string, number>>((accumulator, item) => {
+      accumulator[item.status] = (accumulator[item.status] ?? 0) + 1;
+      return accumulator;
+    }, {}),
+  ).sort((left, right) => right[1] - left[1]);
+  const workflowCounts = Object.entries(
+    cases.reduce<Record<string, number>>((accumulator, item) => {
+      accumulator[item.workflowType] = (accumulator[item.workflowType] ?? 0) + 1;
+      return accumulator;
+    }, {}),
+  ).sort((left, right) => right[1] - left[1]);
+  const metrics = isLive
+    ? [
+        { label: "Open cases", value: String(openCases), tone: "metric-neutral", note: "All non-closed cases" },
+        {
+          label: "Awaiting approval",
+          value: String(awaitingApproval),
+          tone: awaitingApproval > 0 ? "metric-attention" : "metric-neutral",
+          note: "Approval queue plus approver follow-up states",
+        },
+        {
+          label: "Finance review",
+          value: String(financeReview),
+          tone: financeReview > 0 ? "metric-attention" : "metric-neutral",
+          note: "Cases escalated for finance handling",
+        },
+        {
+          label: "Recoverable exceptions",
+          value: String(recoverableExceptions),
+          tone: recoverableExceptions > 0 ? "metric-critical" : "metric-neutral",
+          note: "Retryable cases that still need operator attention",
+        },
+      ]
+    : [
+        {
+          label: "Live summary",
+          value: "Unavailable",
+          tone: "metric-critical",
+          note: `Start the API at ${apiBaseUrl} to load dashboard data.`,
+        },
+        { label: "Approval lane", value: "Route ready", tone: "metric-neutral", note: "Use the approvals page for action controls." },
+        { label: "Finance lane", value: "Route ready", tone: "metric-neutral", note: "Use finance review for escalated cases." },
+        { label: "Case detail", value: "Route ready", tone: "metric-neutral", note: "Open a case from the dashboard once data is available." },
+      ];
+
   return (
     <div className="workspace workspace-tight fade-up">
+      {!isLive && errorMessage ? (
+        <div className="notice">
+          <strong>Dashboard data failed to load.</strong>
+          <p className="muted">
+            {errorMessage} Expected API base URL: <code>{apiBaseUrl}</code>.
+          </p>
+        </div>
+      ) : null}
+
       <section className="workspace-header">
         <div>
-          <span className="kicker">Financial command center</span>
+          <span className="kicker">Operational dashboard</span>
           <h1>Dashboard</h1>
-          <p className="section-copy">Monitor case throughput, approval response, and downstream workflow health in one workspace.</p>
+          <p className="section-copy">
+            Monitor the current case list, queue counts, and workflow states exposed by the API. This page avoids
+            invented analytics and focuses on operator-visible status.
+          </p>
         </div>
         <div className="split-actions">
-          <span className="inline-status inline-status-success">Healthy</span>
-          <button className="button-secondary" type="button">
-            Export report
-          </button>
+          <span className={`inline-status${isLive ? " inline-status-success" : ""}`}>
+            {isLive ? "Live data" : "API unavailable"}
+          </span>
+          <Link className="button-secondary" href="/cases/new">
+            New case
+          </Link>
         </div>
       </section>
 
@@ -57,22 +158,23 @@ export default function DashboardPage() {
       <section className="surface fade-up-delay">
         <div className="surface-head">
           <div>
-            <p className="eyebrow">Copilot insight</p>
-            <h2>Cash flow surplus predicted for October.</h2>
+            <p className="eyebrow">Queue summary</p>
+            <h2>Current workflow checkpoints</h2>
           </div>
-          <span className="inline-status">Auto processed</span>
+          <span className="inline-status">{isLive ? `${cases.length} case${cases.length === 1 ? "" : "s"}` : "No data"}</span>
         </div>
         <p className="section-copy">
-          Based on current accounts receivable and project milestones, the system anticipates a 14% increase in
-          liquidity and suggests reallocating reserve capacity into active operating spend.
+          {isLive
+            ? `There are ${awaitingRequesterInfo} case${awaitingRequesterInfo === 1 ? "" : "s"} awaiting requester information, ${awaitingApproval} in approval, ${financeReview} in finance review, and ${exportReady} marked export-ready.`
+            : "Case summaries appear here after the dashboard can reach the API."}
         </p>
         <div className="hero-actions">
-          <button className="button-primary" type="button">
-            Apply recommendation
-          </button>
-          <button className="button-secondary" type="button">
-            View analysis
-          </button>
+          <Link className="button-primary" href="/approvals">
+            Open approvals
+          </Link>
+          <Link className="button-secondary" href="/finance-review">
+            Open finance review
+          </Link>
         </div>
       </section>
 
@@ -80,41 +182,52 @@ export default function DashboardPage() {
         <article className="dashboard-chart">
           <div className="surface-head">
             <div>
-              <p className="eyebrow">Cash flow velocity</p>
-              <h2>Rolling 7-day transaction volume</h2>
+              <p className="eyebrow">Case statuses</p>
+              <h2>Live workflow breakdown</h2>
             </div>
-            <div className="metric-inline">
-              <span className="inline-status">Inbound</span>
-              <span className="inline-status">Outbound</span>
-            </div>
+            <span className="inline-status">{statusCounts.length} visible status{statusCounts.length === 1 ? "" : "es"}</span>
           </div>
-          <div className="chart-bars" aria-hidden="true">
-            {chartBars.map((bar) => (
-              <div key={bar.day} className={`chart-bar${bar.soft ? " chart-bar-soft" : ""}`}>
-                <div className="chart-fill" style={{ height: `${bar.height}%` }} />
-                <span className="accent-copy">{bar.day}</span>
+          <div className="data-list">
+            {statusCounts.length ? (
+              statusCounts.map(([status, count]) => (
+                <div key={status} className="data-row">
+                  <strong>{humanizeValue(status)}</strong>
+                  <span>{count} case{count === 1 ? "" : "s"}</span>
+                </div>
+              ))
+            ) : (
+              <div className="data-row">
+                <strong>No status data</strong>
+                <span className="muted">The case list is empty or unavailable.</span>
               </div>
-            ))}
+            )}
           </div>
         </article>
 
         <article className="dashboard-signal">
           <div className="surface-head">
             <div>
-              <p className="eyebrow">Active workflows</p>
-              <h2>Current movement</h2>
+              <p className="eyebrow">Workflow mix</p>
+              <h2>Cases by workflow type</h2>
             </div>
           </div>
           <div className="signal-list">
-            {workflowSignals.map((signal) => (
-              <div key={signal.title} className="signal-item">
-                <div className="split-line">
-                  <strong>{signal.title}</strong>
-                  <span>{signal.progress}</span>
+            {workflowCounts.length ? (
+              workflowCounts.map(([workflowType, count]) => (
+                <div key={workflowType} className="signal-item">
+                  <div className="split-line">
+                    <strong>{humanizeValue(workflowType)}</strong>
+                    <span>{count}</span>
+                  </div>
+                  <p className="muted">Live cases currently associated with this workflow.</p>
                 </div>
-                <p className="muted">{signal.note}</p>
+              ))
+            ) : (
+              <div className="signal-item">
+                <strong>No workflow data yet</strong>
+                <p className="muted">Create a case to populate workflow mix on this dashboard.</p>
               </div>
-            ))}
+            )}
           </div>
         </article>
       </section>
@@ -122,32 +235,49 @@ export default function DashboardPage() {
       <section className="surface">
         <div className="surface-head">
           <div>
-            <p className="eyebrow">Recent transactions</p>
-            <h2>Operational ledger</h2>
+            <p className="eyebrow">Recent cases</p>
+            <h2>Latest case records</h2>
           </div>
-          <span className="inline-status">All categories</span>
+          <span className="inline-status">{cases.slice(0, 5).length} shown</span>
         </div>
         <div className="data-list">
           <div className="data-row data-row-head">
-            <span>Entity / transaction</span>
-            <span>Category</span>
-            <span>Date</span>
+            <span>Case / workflow</span>
+            <span>Requester</span>
+            <span>Opened</span>
             <span>Status</span>
-            <span>Amount</span>
+            <span>Artifacts</span>
           </div>
-          {transactions.map((transaction) => (
-            <div
-              key={`${transaction.entity}-${transaction.date}`}
-              className="data-row"
-              style={{ gridTemplateColumns: "1.3fr 1fr 0.9fr 0.9fr auto" }}
-            >
-              <strong>{transaction.entity}</strong>
-              <span>{transaction.category}</span>
-              <span>{transaction.date}</span>
-              <span className="inline-status">{transaction.status}</span>
-              <strong>{transaction.amount}</strong>
+          {cases.length ? (
+            cases.slice(0, 5).map((item) => (
+              <div
+                key={item.id}
+                className="data-row"
+                style={{ gridTemplateColumns: "1.3fr 1fr 0.9fr 0.9fr auto" }}
+              >
+                <div>
+                  <strong>{item.id}</strong>
+                  <p className="muted">{humanizeValue(item.workflowType)}</p>
+                </div>
+                <span>{item.requesterId}</span>
+                <span>{formatRelative(item.createdAt)}</span>
+                <span className="inline-status">{humanizeValue(item.status)}</span>
+                <Link href={`/cases/${item.id}`}>{item.artifacts?.length ?? 0} file{item.artifacts?.length === 1 ? "" : "s"}</Link>
+              </div>
+            ))
+          ) : (
+            <div className="empty-state">
+              <div>
+                <p className="eyebrow">Case list</p>
+                <h2>{isLive ? "No cases to display" : "Case list unavailable"}</h2>
+                <p className="muted">
+                  {isLive
+                    ? "Submit a case from the requester flow, then return here to review live workflow states."
+                    : `Start the API at ${apiBaseUrl} to load recent cases on this dashboard.`}
+                </p>
+              </div>
             </div>
-          ))}
+          )}
         </div>
       </section>
     </div>

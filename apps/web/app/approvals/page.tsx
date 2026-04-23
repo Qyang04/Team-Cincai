@@ -1,25 +1,29 @@
-import { approvalQueueResponseSchema, type ApprovalQueueItem } from "@finance-ops/shared";
+import { DEFAULT_API_BASE_URL, approvalQueueResponseSchema, type ApprovalQueueItem } from "@finance-ops/shared";
 import Link from "next/link";
+import { fetchApiJson } from "../lib/server-api";
 import { ApprovalActionForm } from "./approval-action-form";
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
 
-async function getApprovalTasks(): Promise<ApprovalQueueItem[]> {
-  try {
-    const response = await fetch(`${apiBaseUrl}/cases/approvals/tasks`, {
+async function getApprovalTasks(): Promise<{ tasks: ApprovalQueueItem[]; errorMessage: string | null }> {
+  const result = await fetchApiJson<ApprovalQueueItem[]>({
+    url: `${apiBaseUrl}/cases/approvals/tasks`,
+    init: {
       cache: "no-store",
       headers: {
         "x-mock-role": "APPROVER",
         "x-mock-user-id": "manager.approver",
       },
-    });
-    if (!response.ok) {
-      return [];
-    }
-    return approvalQueueResponseSchema.parse(await response.json());
-  } catch {
-    return [];
-  }
+    },
+    fallbackData: [],
+    resourceLabel: "Approval queue",
+    parse: (value) => approvalQueueResponseSchema.parse(value),
+  });
+
+  return {
+    tasks: result.data,
+    errorMessage: result.ok ? null : result.message,
+  };
 }
 
 function humanizeWorkflow(workflowType: string): string {
@@ -39,10 +43,19 @@ function formatRelative(dateString: string): string {
 }
 
 export default async function ApprovalsPage() {
-  const tasks = await getApprovalTasks();
+  const { tasks, errorMessage } = await getApprovalTasks();
 
   return (
     <div className="workspace workspace-tight fade-up">
+      {errorMessage ? (
+        <div className="notice">
+          <strong>Approval queue failed to load.</strong>
+          <p className="muted">
+            {errorMessage} Expected API base URL: <code>{apiBaseUrl}</code>.
+          </p>
+        </div>
+      ) : null}
+
       <section className="workspace-header">
         <div>
           <span className="kicker">Approval lane</span>
@@ -117,8 +130,9 @@ export default async function ApprovalsPage() {
                 Once policy review routes a case to approval, it will appear here with decision controls.
               </p>
               <p className="muted">
-                If you expected a task, confirm the API is running at <code>{apiBaseUrl}</code> and that policy routed
-                the case to <code>AWAITING_APPROVAL</code>.
+                {errorMessage
+                  ? errorMessage
+                  : `If you expected a task, confirm the API is running at ${apiBaseUrl} and that policy routed the case to AWAITING_APPROVAL.`}
               </p>
             </div>
           </article>

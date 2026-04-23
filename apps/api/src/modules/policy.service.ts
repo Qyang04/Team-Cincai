@@ -41,11 +41,13 @@ export class PolicyService {
       blockingIssues.push("Project code is required before approval.");
     }
 
-    const lowerNames = caseRecord.artifacts.map((artifact) => artifact.filename.toLowerCase());
+    const lowerNames = caseRecord.artifacts.map((artifact: { filename: string }) =>
+      artifact.filename.toLowerCase(),
+    );
     if (policyConfig.duplicateFilenameDetection && new Set(lowerNames).size !== lowerNames.length) {
       duplicateSignals.push("Duplicate filenames detected.");
     }
-    if (policyConfig.duplicateFilenameDetection && lowerNames.some((name) => name.includes("duplicate"))) {
+    if (policyConfig.duplicateFilenameDetection && lowerNames.some((name: string) => name.includes("duplicate"))) {
       duplicateSignals.push("Filename indicates a possible duplicate submission.");
     }
 

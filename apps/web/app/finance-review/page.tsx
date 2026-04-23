@@ -1,25 +1,29 @@
-import { financeReviewQueueResponseSchema, type FinanceReviewQueueItem } from "@finance-ops/shared";
+import { DEFAULT_API_BASE_URL, financeReviewQueueResponseSchema, type FinanceReviewQueueItem } from "@finance-ops/shared";
 import Link from "next/link";
+import { fetchApiJson } from "../lib/server-api";
 import { FinanceReviewActionForm } from "./finance-review-action-form";
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
 
-async function getFinanceReviewCases(): Promise<FinanceReviewQueueItem[]> {
-  try {
-    const response = await fetch(`${apiBaseUrl}/cases/finance-review/cases`, {
+async function getFinanceReviewCases(): Promise<{ reviews: FinanceReviewQueueItem[]; errorMessage: string | null }> {
+  const result = await fetchApiJson<FinanceReviewQueueItem[]>({
+    url: `${apiBaseUrl}/cases/finance-review/cases`,
+    init: {
       cache: "no-store",
       headers: {
         "x-mock-role": "FINANCE_REVIEWER",
         "x-mock-user-id": "finance.reviewer",
       },
-    });
-    if (!response.ok) {
-      return [];
-    }
-    return financeReviewQueueResponseSchema.parse(await response.json());
-  } catch {
-    return [];
-  }
+    },
+    fallbackData: [],
+    resourceLabel: "Finance review queue",
+    parse: (value) => financeReviewQueueResponseSchema.parse(value),
+  });
+
+  return {
+    reviews: result.data,
+    errorMessage: result.ok ? null : result.message,
+  };
 }
 
 function humanizeWorkflow(workflowType: string): string {
@@ -30,10 +34,19 @@ function humanizeWorkflow(workflowType: string): string {
 }
 
 export default async function FinanceReviewPage() {
-  const reviews = await getFinanceReviewCases();
+  const { reviews, errorMessage } = await getFinanceReviewCases();
 
   return (
     <div className="workspace workspace-tight fade-up">
+      {errorMessage ? (
+        <div className="notice">
+          <strong>Finance review queue failed to load.</strong>
+          <p className="muted">
+            {errorMessage} Expected API base URL: <code>{apiBaseUrl}</code>.
+          </p>
+        </div>
+      ) : null}
+
       <section className="workspace-header">
         <div>
           <span className="kicker">Exception lane</span>
@@ -105,8 +118,9 @@ export default async function FinanceReviewPage() {
                 When policy escalates a case to finance review, it will appear here with manual decision controls.
               </p>
               <p className="muted">
-                If you expected a case, confirm the API is running at <code>{apiBaseUrl}</code> and that policy routed
-                it to <code>FINANCE_REVIEW</code>.
+                {errorMessage
+                  ? errorMessage
+                  : `If you expected a case, confirm the API is running at ${apiBaseUrl} and that policy routed it to FINANCE_REVIEW.`}
               </p>
             </div>
           </article>
