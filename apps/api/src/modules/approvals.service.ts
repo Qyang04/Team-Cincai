@@ -1,5 +1,16 @@
 import { Injectable } from "@nestjs/common";
+import {
+  approvalQueueResponseSchema,
+  type ApprovalQueueItem,
+} from "@finance-ops/shared";
 import { PrismaService } from "./prisma.service";
+
+function toIsoDateTimeString(value: Date | string | null | undefined) {
+  if (value === null || value === undefined) {
+    return value;
+  }
+  return typeof value === "string" ? value : value.toISOString();
+}
 
 @Injectable()
 export class ApprovalsService {
@@ -15,12 +26,35 @@ export class ApprovalsService {
     });
   }
 
-  async listPendingTasks() {
-    return this.prisma.approvalTask.findMany({
+  async listPendingTasks(): Promise<ApprovalQueueItem[]> {
+    const tasks = await this.prisma.approvalTask.findMany({
       where: { status: "PENDING" },
       orderBy: { createdAt: "asc" },
       include: { case: true },
     });
+
+    return approvalQueueResponseSchema.parse(
+      tasks.map((task) => ({
+        id: task.id,
+        caseId: task.caseId,
+        approverId: task.approverId,
+        status: task.status,
+        decision: task.decision,
+        decisionReason: task.decisionReason,
+        dueAt: toIsoDateTimeString(task.dueAt),
+        createdAt: toIsoDateTimeString(task.createdAt),
+        updatedAt: toIsoDateTimeString(task.updatedAt),
+        case: {
+          id: task.case.id,
+          workflowType: task.case.workflowType,
+          status: task.case.status,
+          priority: task.case.priority,
+          requesterId: task.case.requesterId,
+          createdAt: toIsoDateTimeString(task.case.createdAt),
+          updatedAt: toIsoDateTimeString(task.case.updatedAt),
+        },
+      })),
+    );
   }
 
   async getTask(taskId: string) {

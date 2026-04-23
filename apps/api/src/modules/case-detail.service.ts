@@ -1,4 +1,8 @@
 import { Injectable } from "@nestjs/common";
+import {
+  caseDetailResponseSchema,
+  type CaseDetailResponse,
+} from "@finance-ops/shared";
 import { PrismaService } from "./prisma.service";
 
 const manualActionStatuses = new Set([
@@ -27,6 +31,17 @@ type ExportRecordLike = {
 type ArtifactLike = {
   processingStatus?: string | null;
 };
+
+function toIsoDateTimeString(value: Date | string): string {
+  return typeof value === "string" ? value : value.toISOString();
+}
+
+function toNullableIsoDateTimeString(value: Date | string | null | undefined) {
+  if (value === null || value === undefined) {
+    return value;
+  }
+  return toIsoDateTimeString(value);
+}
 
 function getLatestAiDecision(auditEvents: AuditEventLike[]) {
   for (const event of [...auditEvents].reverse()) {
@@ -171,7 +186,7 @@ function getExportReadinessSummary(status: string, latestExportRecord: ExportRec
 export class CaseDetailService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getCaseDetail(caseId: string) {
+  async getCaseDetail(caseId: string): Promise<CaseDetailResponse | null> {
     const caseDetail = await this.prisma.case.findUnique({
       where: { id: caseId },
       include: {
@@ -213,19 +228,174 @@ export class CaseDetailService {
       latestExportRecord as ExportRecordLike | null,
     );
 
-    return {
-      ...caseDetail,
+    return caseDetailResponseSchema.parse({
+      id: caseDetail.id,
+      workflowType: caseDetail.workflowType,
+      status: caseDetail.status,
+      requesterId: caseDetail.requesterId,
+      assignedTo: caseDetail.assignedTo,
+      priority: caseDetail.priority,
+      createdAt: toIsoDateTimeString(caseDetail.createdAt),
+      updatedAt: toIsoDateTimeString(caseDetail.updatedAt),
       stage: caseDetail.status,
       manualActionRequired: manualActionStatuses.has(caseDetail.status),
-      latestExtraction,
-      latestPolicyResult,
-      latestApprovalTask,
-      latestFinanceReview,
-      latestExportRecord,
+      latestExtraction: latestExtraction
+        ? {
+            id: latestExtraction.id,
+            caseId: latestExtraction.caseId,
+            fieldsJson: latestExtraction.fieldsJson as Record<string, string | number | boolean | null>,
+            confidence: latestExtraction.confidence,
+            provenance: (latestExtraction.provenance as Record<string, string> | null | undefined) ?? null,
+            createdAt: toIsoDateTimeString(latestExtraction.createdAt),
+          }
+        : null,
+      latestPolicyResult: latestPolicyResult
+        ? {
+            id: latestPolicyResult.id,
+            caseId: latestPolicyResult.caseId,
+            passed: latestPolicyResult.passed,
+            warnings: latestPolicyResult.warnings,
+            blockingIssues: latestPolicyResult.blockingIssues,
+            requiresFinanceReview: latestPolicyResult.requiresFinanceReview,
+            duplicateSignals: latestPolicyResult.duplicateSignals,
+            reconciliationFlags: undefined,
+            approvalRequirement: undefined,
+            createdAt: toIsoDateTimeString(latestPolicyResult.createdAt),
+          }
+        : null,
+      latestApprovalTask: latestApprovalTask
+        ? {
+            id: latestApprovalTask.id,
+            caseId: latestApprovalTask.caseId,
+            approverId: latestApprovalTask.approverId,
+            status: latestApprovalTask.status,
+            decision: latestApprovalTask.decision,
+            decisionReason: latestApprovalTask.decisionReason,
+            dueAt: toNullableIsoDateTimeString(latestApprovalTask.dueAt),
+            createdAt: toIsoDateTimeString(latestApprovalTask.createdAt),
+            updatedAt: toIsoDateTimeString(latestApprovalTask.updatedAt),
+          }
+        : null,
+      latestFinanceReview: latestFinanceReview
+        ? {
+            id: latestFinanceReview.id,
+            caseId: latestFinanceReview.caseId,
+            reviewerId: latestFinanceReview.reviewerId,
+            outcome: latestFinanceReview.outcome,
+            note: latestFinanceReview.note,
+            createdAt: toIsoDateTimeString(latestFinanceReview.createdAt),
+            updatedAt: toIsoDateTimeString(latestFinanceReview.updatedAt),
+          }
+        : null,
+      latestExportRecord: latestExportRecord
+        ? {
+            id: latestExportRecord.id,
+            caseId: latestExportRecord.caseId,
+            status: latestExportRecord.status,
+            connectorName: latestExportRecord.connectorName,
+            errorMessage: latestExportRecord.errorMessage,
+            createdAt: toIsoDateTimeString(latestExportRecord.createdAt),
+            updatedAt: toIsoDateTimeString(latestExportRecord.updatedAt),
+          }
+        : null,
       reasoningSummary,
       recommendedAction,
       failureMode,
       exportReadinessSummary,
-    };
+      artifacts: caseDetail.artifacts.map((artifact) => ({
+        id: artifact.id,
+        caseId: artifact.caseId,
+        type: artifact.type,
+        filename: artifact.filename,
+        mimeType: artifact.mimeType,
+        storageUri: artifact.storageUri,
+        extractedText: artifact.extractedText,
+        processingStatus: artifact.processingStatus,
+        errorMessage: artifact.errorMessage,
+        uploadedAt: toNullableIsoDateTimeString(artifact.uploadedAt),
+        processingStartedAt: toNullableIsoDateTimeString(artifact.processingStartedAt),
+        processingCompletedAt: toNullableIsoDateTimeString(artifact.processingCompletedAt),
+        createdAt: toIsoDateTimeString(artifact.createdAt),
+        updatedAt: toIsoDateTimeString(artifact.updatedAt),
+      })),
+      extractionResults: caseDetail.extractionResults.map((result) => ({
+        id: result.id,
+        caseId: result.caseId,
+        fieldsJson: result.fieldsJson as Record<string, string | number | boolean | null>,
+        confidence: result.confidence,
+        provenance: (result.provenance as Record<string, string> | null | undefined) ?? null,
+        createdAt: toIsoDateTimeString(result.createdAt),
+      })),
+      openQuestions: caseDetail.openQuestions.map((question) => ({
+        id: question.id,
+        caseId: question.caseId,
+        question: question.question,
+        answer: question.answer,
+        status: question.status,
+        source: question.source,
+        createdAt: toIsoDateTimeString(question.createdAt),
+        updatedAt: toIsoDateTimeString(question.updatedAt),
+      })),
+      policyResults: caseDetail.policyResults.map((result) => ({
+        id: result.id,
+        caseId: result.caseId,
+        passed: result.passed,
+        warnings: result.warnings,
+        blockingIssues: result.blockingIssues,
+        requiresFinanceReview: result.requiresFinanceReview,
+        duplicateSignals: result.duplicateSignals,
+        reconciliationFlags: undefined,
+        approvalRequirement: undefined,
+        createdAt: toIsoDateTimeString(result.createdAt),
+      })),
+      approvalTasks: caseDetail.approvalTasks.map((task) => ({
+        id: task.id,
+        caseId: task.caseId,
+        approverId: task.approverId,
+        status: task.status,
+        decision: task.decision,
+        decisionReason: task.decisionReason,
+        dueAt: toNullableIsoDateTimeString(task.dueAt),
+        createdAt: toIsoDateTimeString(task.createdAt),
+        updatedAt: toIsoDateTimeString(task.updatedAt),
+      })),
+      financeReviews: caseDetail.financeReviews.map((review) => ({
+        id: review.id,
+        caseId: review.caseId,
+        reviewerId: review.reviewerId,
+        outcome: review.outcome,
+        note: review.note,
+        createdAt: toIsoDateTimeString(review.createdAt),
+        updatedAt: toIsoDateTimeString(review.updatedAt),
+      })),
+      exportRecords: caseDetail.exportRecords.map((record) => ({
+        id: record.id,
+        caseId: record.caseId,
+        status: record.status,
+        connectorName: record.connectorName,
+        errorMessage: record.errorMessage,
+        createdAt: toIsoDateTimeString(record.createdAt),
+        updatedAt: toIsoDateTimeString(record.updatedAt),
+      })),
+      workflowTransitions: caseDetail.workflowTransitions.map((transition) => ({
+        id: transition.id,
+        caseId: transition.caseId,
+        fromStatus: transition.fromStatus,
+        toStatus: transition.toStatus,
+        actorType: transition.actorType,
+        actorId: transition.actorId,
+        note: transition.note,
+        createdAt: toIsoDateTimeString(transition.createdAt),
+      })),
+      auditEvents: caseDetail.auditEvents.map((event) => ({
+        id: event.id,
+        caseId: event.caseId,
+        eventType: event.eventType,
+        actorType: event.actorType,
+        actorId: event.actorId,
+        payload: event.payload as Record<string, unknown>,
+        createdAt: toIsoDateTimeString(event.createdAt),
+      })),
+    });
   }
 }

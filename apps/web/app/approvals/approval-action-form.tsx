@@ -1,5 +1,6 @@
 "use client";
 
+import { approvalActionResponseSchema } from "@finance-ops/shared";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -47,6 +48,10 @@ export function ApprovalActionForm({ taskId }: { taskId: string }) {
 
         if (!response.ok) {
           throw new Error(`Approval action failed (${response.status}).`);
+        }
+        const result = approvalActionResponseSchema.parse(await response.json());
+        if (!result.success) {
+          throw new Error(result.error);
         }
 
         const successMessage =

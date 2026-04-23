@@ -1,21 +1,16 @@
 import { Injectable } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
+import {
+  adminPolicyConfigSchema,
+  adminRoutingConfigSchema,
+  type AdminPolicyConfig,
+  type AdminPolicyConfigUpdate,
+  type AdminRoutingConfig,
+  type AdminRoutingConfigUpdate,
+} from "@finance-ops/shared";
 import { PrismaService } from "./prisma.service";
 
-type PolicyConfig = {
-  managerApprovalThreshold: number;
-  requireProjectCodeWorkflows: string[];
-  duplicateFilenameDetection: boolean;
-  invoiceNumberRequiredForVendorInvoices: boolean;
-};
-
-type RoutingConfig = {
-  defaultApproverId: string;
-  financeReviewerId: string;
-  escalationWindowHours: number;
-};
-
-const DEFAULT_POLICY_CONFIG: PolicyConfig = {
+const DEFAULT_POLICY_CONFIG: AdminPolicyConfig = {
   managerApprovalThreshold: 500,
   requireProjectCodeWorkflows: [
     "EXPENSE_CLAIM",
@@ -26,7 +21,7 @@ const DEFAULT_POLICY_CONFIG: PolicyConfig = {
   invoiceNumberRequiredForVendorInvoices: true,
 };
 
-const DEFAULT_ROUTING_CONFIG: RoutingConfig = {
+const DEFAULT_ROUTING_CONFIG: AdminRoutingConfig = {
   defaultApproverId: "manager.approver",
   financeReviewerId: "finance.reviewer",
   escalationWindowHours: 24,
@@ -49,26 +44,27 @@ export class AdminConfigService {
     });
   }
 
-  getPolicyConfig() {
-    return this.getSetting("policyConfig", DEFAULT_POLICY_CONFIG);
+  async getPolicyConfig(): Promise<AdminPolicyConfig> {
+    const value = await this.getSetting("policyConfig", DEFAULT_POLICY_CONFIG);
+    return adminPolicyConfigSchema.parse(value);
   }
 
-  getRoutingConfig() {
-    return this.getSetting("routingConfig", DEFAULT_ROUTING_CONFIG);
+  async getRoutingConfig(): Promise<AdminRoutingConfig> {
+    const value = await this.getSetting("routingConfig", DEFAULT_ROUTING_CONFIG);
+    return adminRoutingConfigSchema.parse(value);
   }
 
-  async updatePolicyConfig(partial: Partial<PolicyConfig>) {
+  async updatePolicyConfig(partial: AdminPolicyConfigUpdate): Promise<AdminPolicyConfig> {
     const current = await this.getPolicyConfig();
-    const next = { ...current, ...partial };
+    const next = adminPolicyConfigSchema.parse({ ...current, ...partial });
     await this.upsertSetting("policyConfig", next as Prisma.InputJsonValue);
     return next;
   }
 
-  async updateRoutingConfig(partial: Partial<RoutingConfig>) {
+  async updateRoutingConfig(partial: AdminRoutingConfigUpdate): Promise<AdminRoutingConfig> {
     const current = await this.getRoutingConfig();
-    const next = { ...current, ...partial };
+    const next = adminRoutingConfigSchema.parse({ ...current, ...partial });
     await this.upsertSetting("routingConfig", next as Prisma.InputJsonValue);
     return next;
   }
 }
-

@@ -1,8 +1,8 @@
 import { Body, Controller, Get, Post } from "@nestjs/common";
+import { adminPolicyConfigUpdateSchema, adminRoutingConfigUpdateSchema } from "@finance-ops/shared";
 import { Roles } from "./roles.decorator";
 import { AdminConfigService } from "./admin-config.service";
 import { ConnectorHealthService } from "./connector-health.service";
-import { adminPolicyConfigSchema, adminRoutingConfigSchema } from "./dto";
 
 @Controller("admin")
 @Roles("ADMIN")
@@ -19,7 +19,7 @@ export class AdminController {
 
   @Post("policies")
   updatePolicies(@Body() body: unknown) {
-    const input = adminPolicyConfigSchema.parse(body);
+    const input = adminPolicyConfigUpdateSchema.parse(body);
     return this.adminConfigService.updatePolicyConfig(input);
   }
 
@@ -30,7 +30,7 @@ export class AdminController {
 
   @Post("routing")
   updateRouting(@Body() body: unknown) {
-    const input = adminRoutingConfigSchema.parse(body);
+    const input = adminRoutingConfigUpdateSchema.parse(body);
     return this.adminConfigService.updateRoutingConfig(input);
   }
 

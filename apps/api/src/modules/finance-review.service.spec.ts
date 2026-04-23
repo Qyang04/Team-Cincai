@@ -44,6 +44,8 @@ test("FinanceReviewService makes newly escalated cases visible in the open revie
             status: "FINANCE_REVIEW",
             priority: "HIGH",
             requesterId: "demo.requester",
+            createdAt: new Date("2026-04-22T08:59:00.000Z"),
+            updatedAt: new Date("2026-04-22T09:00:00.000Z"),
           },
         };
         reviews.push(review);
@@ -66,14 +68,16 @@ test("FinanceReviewService makes newly escalated cases visible in the open revie
     note: "Threshold exceeded.",
     outcome: null,
     reviewerId: null,
-    createdAt: new Date("2026-04-22T09:00:00.000Z"),
-    updatedAt: new Date("2026-04-22T09:00:00.000Z"),
+    createdAt: "2026-04-22T09:00:00.000Z",
+    updatedAt: "2026-04-22T09:00:00.000Z",
     case: {
       id: "case-9",
       workflowType: "EXPENSE_CLAIM",
       status: "FINANCE_REVIEW",
       priority: "HIGH",
       requesterId: "demo.requester",
+      createdAt: "2026-04-22T08:59:00.000Z",
+      updatedAt: "2026-04-22T09:00:00.000Z",
     },
   });
 });

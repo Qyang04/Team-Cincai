@@ -1,5 +1,6 @@
 "use client";
 
+import { financeReviewActionResponseSchema } from "@finance-ops/shared";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -42,6 +43,10 @@ export function FinanceReviewActionForm({ reviewId }: { reviewId: string }) {
 
         if (!response.ok) {
           throw new Error(`Finance review action failed (${response.status}).`);
+        }
+        const result = financeReviewActionResponseSchema.parse(await response.json());
+        if (!result.success) {
+          throw new Error(result.error);
         }
 
         const successMessage =

@@ -37,16 +37,3 @@ export const completeArtifactUploadSchema = z.object({
 export const processArtifactSchema = z.object({
   artifactId: z.string().min(1),
 });
-
-export const adminPolicyConfigSchema = z.object({
-  managerApprovalThreshold: z.number().min(0).optional(),
-  requireProjectCodeWorkflows: z.array(z.string()).optional(),
-  duplicateFilenameDetection: z.boolean().optional(),
-  invoiceNumberRequiredForVendorInvoices: z.boolean().optional(),
-});
-
-export const adminRoutingConfigSchema = z.object({
-  defaultApproverId: z.string().min(1).optional(),
-  financeReviewerId: z.string().min(1).optional(),
-  escalationWindowHours: z.number().min(1).optional(),
-});

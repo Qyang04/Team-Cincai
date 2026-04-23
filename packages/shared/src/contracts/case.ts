@@ -53,6 +53,12 @@ export const caseSummarySchema = z.object({
 });
 export type CaseSummary = z.infer<typeof caseSummarySchema>;
 
+export const caseStatusSnapshotSchema = caseSummarySchema.pick({
+  id: true,
+  status: true,
+});
+export type CaseStatusSnapshot = z.infer<typeof caseStatusSnapshotSchema>;
+
 export const caseArtifactSchema = z.object({
   id: z.string().min(1),
   caseId: z.string().min(1),
@@ -93,6 +99,16 @@ export const caseOpenQuestionSchema = z.object({
 });
 export type CaseOpenQuestion = z.infer<typeof caseOpenQuestionSchema>;
 
+export const caseAnsweredQuestionSchema = caseOpenQuestionSchema.pick({
+  id: true,
+  caseId: true,
+  question: true,
+  answer: true,
+  status: true,
+  source: true,
+});
+export type CaseAnsweredQuestion = z.infer<typeof caseAnsweredQuestionSchema>;
+
 export const casePolicyResultSchema = z.object({
   id: z.string().min(1),
   caseId: z.string().min(1),
@@ -106,6 +122,17 @@ export const casePolicyResultSchema = z.object({
   createdAt: isoDateTimeStringSchema,
 });
 export type CasePolicyResult = z.infer<typeof casePolicyResultSchema>;
+
+export const casePolicyResultSummarySchema = casePolicyResultSchema.pick({
+  passed: true,
+  warnings: true,
+  blockingIssues: true,
+  requiresFinanceReview: true,
+  duplicateSignals: true,
+  reconciliationFlags: true,
+  approvalRequirement: true,
+});
+export type CasePolicyResultSummary = z.infer<typeof casePolicyResultSummarySchema>;
 
 export const caseApprovalTaskSchema = z.object({
   id: z.string().min(1),
@@ -131,6 +158,15 @@ export const caseFinanceReviewItemSchema = z.object({
 });
 export type CaseFinanceReviewItem = z.infer<typeof caseFinanceReviewItemSchema>;
 
+export const caseFinanceReviewResolutionSchema = caseFinanceReviewItemSchema.pick({
+  id: true,
+  caseId: true,
+  reviewerId: true,
+  outcome: true,
+  note: true,
+});
+export type CaseFinanceReviewResolution = z.infer<typeof caseFinanceReviewResolutionSchema>;
+
 export const caseExportRecordSchema = z.object({
   id: z.string().min(1),
   caseId: z.string().min(1),
@@ -141,6 +177,15 @@ export const caseExportRecordSchema = z.object({
   updatedAt: isoDateTimeStringSchema,
 });
 export type CaseExportRecord = z.infer<typeof caseExportRecordSchema>;
+
+export const caseExportRecordSnapshotSchema = caseExportRecordSchema.pick({
+  id: true,
+  caseId: true,
+  status: true,
+  connectorName: true,
+  errorMessage: true,
+});
+export type CaseExportRecordSnapshot = z.infer<typeof caseExportRecordSnapshotSchema>;
 
 export const caseWorkflowTransitionSchema = z.object({
   id: z.string().min(1),
@@ -233,6 +278,62 @@ export const financeReviewQueueItemSchema = caseFinanceReviewItemSchema.extend({
 export const financeReviewQueueResponseSchema = z.array(financeReviewQueueItemSchema);
 export type FinanceReviewQueueItem = z.infer<typeof financeReviewQueueItemSchema>;
 
+const actionErrorResponseSchema = z.object({
+  success: z.literal(false),
+  error: z.string().min(1),
+});
+export type ActionErrorResponse = z.infer<typeof actionErrorResponseSchema>;
+
+function createActionResponseSchema<TData extends z.ZodTypeAny>(dataSchema: TData) {
+  return z.discriminatedUnion("success", [
+    z.object({
+      success: z.literal(true),
+      data: dataSchema,
+    }),
+    actionErrorResponseSchema,
+  ]);
+}
+
+export const questionResponseActionResponseSchema = createActionResponseSchema(
+  z.object({
+    question: caseAnsweredQuestionSchema,
+  }),
+);
+export type QuestionResponseActionResponse = z.infer<typeof questionResponseActionResponseSchema>;
+
+export const approvalActionResponseSchema = createActionResponseSchema(
+  z.object({
+    case: caseStatusSnapshotSchema,
+    exportRecord: caseExportRecordSnapshotSchema.nullable().optional(),
+  }),
+);
+export type ApprovalActionResponse = z.infer<typeof approvalActionResponseSchema>;
+
+export const financeReviewActionResponseSchema = createActionResponseSchema(
+  z.object({
+    review: caseFinanceReviewResolutionSchema,
+    case: caseStatusSnapshotSchema,
+    exportRecord: caseExportRecordSnapshotSchema.nullable().optional(),
+  }),
+);
+export type FinanceReviewActionResponse = z.infer<typeof financeReviewActionResponseSchema>;
+
+export const exportActionResponseSchema = createActionResponseSchema(
+  z.object({
+    case: caseStatusSnapshotSchema,
+    exportRecord: caseExportRecordSnapshotSchema,
+  }),
+);
+export type ExportActionResponse = z.infer<typeof exportActionResponseSchema>;
+
+export const recoverActionResponseSchema = createActionResponseSchema(
+  z.object({
+    case: caseStatusSnapshotSchema,
+    policyResult: casePolicyResultSummarySchema.nullable(),
+  }),
+);
+export type RecoverActionResponse = z.infer<typeof recoverActionResponseSchema>;
+
 export const workflowDecisionViewSchema = z.object({
   recommendedAction: z.string().min(1),
   reasoningSummary: z.string().min(1),
@@ -255,15 +356,7 @@ export const caseSubmissionResponseSchema = z.object({
     extraction: aiExtractionViewSchema,
     decision: workflowDecisionViewSchema,
   }),
-  policyResult: casePolicyResultSchema.pick({
-    passed: true,
-    warnings: true,
-    blockingIssues: true,
-    requiresFinanceReview: true,
-    duplicateSignals: true,
-    reconciliationFlags: true,
-    approvalRequirement: true,
-  }).nullable(),
+  policyResult: casePolicyResultSummarySchema.nullable(),
 });
 export type CaseSubmissionResponse = z.infer<typeof caseSubmissionResponseSchema>;
 

@@ -1,14 +1,15 @@
 import { Injectable } from "@nestjs/common";
+import { adminConnectorsResponseSchema, type AdminConnectorStatus } from "@finance-ops/shared";
 
 @Injectable()
 export class ConnectorHealthService {
-  getStatus() {
+  getStatus(): AdminConnectorStatus[] {
     const queueMode = process.env.QUEUE_MODE ?? "inline";
     const useMockAi = (process.env.USE_MOCK_AI ?? "true").toLowerCase() !== "false";
     const useMockAuth = (process.env.USE_MOCK_AUTH ?? "true").toLowerCase() !== "false";
     const useMockStorage = (process.env.USE_MOCK_STORAGE ?? "true").toLowerCase() !== "false";
 
-    return [
+    return adminConnectorsResponseSchema.parse([
       {
         connector: "Document extraction",
         status: "mock-ready",
@@ -39,7 +40,6 @@ export class ConnectorHealthService {
         status: "stub-defined",
         detail: "Mock export lifecycle is active with recoverable exception support.",
       },
-    ];
+    ]);
   }
 }
-

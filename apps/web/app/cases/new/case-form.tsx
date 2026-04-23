@@ -1,6 +1,11 @@
 "use client";
 
-import type { CaseSubmissionResponse, CreateCaseResponse, WorkflowType } from "@finance-ops/shared";
+import {
+  caseSubmissionResponseSchema,
+  createCaseResponseSchema,
+  type CaseSubmissionResponse,
+  type WorkflowType,
+} from "@finance-ops/shared";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition, type ClipboardEvent, type DragEvent } from "react";
@@ -100,7 +105,7 @@ export function CaseForm() {
           throw new Error(`Failed to create case (${createResponse.status}).`);
         }
 
-        const created = (await createResponse.json()) as CreateCaseResponse;
+        const created = createCaseResponseSchema.parse(await createResponse.json());
         const submitResponse = await fetch(`${apiBaseUrl}/cases/${created.id}/submit`, {
           method: "POST",
           headers: {
@@ -117,7 +122,7 @@ export function CaseForm() {
 
         setState({
           kind: "success",
-          data: (await submitResponse.json()) as CaseSubmissionResponse,
+          data: caseSubmissionResponseSchema.parse(await submitResponse.json()),
         });
       } catch (error) {
         setState({

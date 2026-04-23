@@ -1,5 +1,11 @@
 import { Injectable } from "@nestjs/common";
-import type { ExtractionResult, PolicyCheckResult, WorkflowDecision } from "@finance-ops/shared";
+import {
+  caseSummarySchema,
+  type CaseSummary,
+  type ExtractionResult,
+  type PolicyCheckResult,
+  type WorkflowDecision,
+} from "@finance-ops/shared";
 import { queueNames } from "./queue.constants";
 import { ArtifactsService } from "./artifacts.service";
 import { AuditService } from "./audit.service";
@@ -21,6 +27,32 @@ type PolicyRouteResult =
   | null;
 
 type ArtifactProcessResult = Awaited<ReturnType<ArtifactsService["markProcessed"]>>;
+
+function toIsoDateTimeString(value: Date | string): string {
+  return typeof value === "string" ? value : value.toISOString();
+}
+
+function toCaseSummary(caseRecord: {
+  id: string;
+  workflowType: string;
+  status: string;
+  requesterId: string;
+  assignedTo?: string | null;
+  priority: string;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}): CaseSummary {
+  return caseSummarySchema.parse({
+    id: caseRecord.id,
+    workflowType: caseRecord.workflowType,
+    status: caseRecord.status,
+    requesterId: caseRecord.requesterId,
+    assignedTo: caseRecord.assignedTo ?? null,
+    priority: caseRecord.priority,
+    createdAt: toIsoDateTimeString(caseRecord.createdAt),
+    updatedAt: toIsoDateTimeString(caseRecord.updatedAt),
+  });
+}
 
 @Injectable()
 export class WorkflowOrchestratorService {
@@ -117,7 +149,7 @@ export class WorkflowOrchestratorService {
       },
     );
 
-    const updated = await this.workflowService.transitionCase({
+    await this.workflowService.transitionCase({
       caseId,
       from: "INTAKE_PROCESSING",
       to: aiResult.decision.nextState,
@@ -141,15 +173,24 @@ export class WorkflowOrchestratorService {
 
     if (aiResult.decision.nextState === "POLICY_REVIEW") {
       const routed = await this.runPolicyAndRoute(caseId);
+      const finalCase = await this.casesService.getCase(caseId);
+      if (!finalCase) {
+        return { error: "Case not found after submission" } as const;
+      }
       return {
-        case: routed?.case ?? updated,
+        case: toCaseSummary(finalCase),
         aiResult,
         policyResult: routed?.policyResult ?? null,
       };
     }
 
+    const finalCase = await this.casesService.getCase(caseId);
+    if (!finalCase) {
+      return { error: "Case not found after submission" } as const;
+    }
+
     return {
-      case: updated,
+      case: toCaseSummary(finalCase),
       aiResult,
       policyResult: null,
     };

@@ -6,6 +6,8 @@ function createCasesControllerHarness(options?: {
   caseRecord?: Record<string, unknown> | null;
   infoRequestedTask?: Record<string, unknown> | null;
   financeReviewRecord?: Record<string, unknown>;
+  approvalTask?: Record<string, unknown> | null;
+  exportProcessResult?: Record<string, unknown>;
 }) {
   const workflowTransitions: Array<Record<string, unknown>> = [];
   const auditEvents: Array<Record<string, unknown>> = [];
@@ -74,7 +76,10 @@ function createCasesControllerHarness(options?: {
       return { id: taskId, status: "PENDING" };
     },
     listPendingTasks: async () => [],
-    getTask: async () => null,
+    getTask: async () =>
+      options && "approvalTask" in options
+        ? options.approvalTask
+        : null,
     markApproved: async () => undefined,
     markRejected: async () => undefined,
     requestInfo: async () => undefined,
@@ -107,12 +112,32 @@ function createCasesControllerHarness(options?: {
           id: caseId,
           status: "AWAITING_APPROVAL",
         },
+        policyResult: {
+          passed: true,
+          warnings: [],
+          blockingIssues: [],
+          requiresFinanceReview: false,
+          duplicateSignals: [],
+        },
         actor,
       };
     },
     submitDraftCase: async () => undefined,
     processArtifactUpload: async () => undefined,
-    processExport: async () => undefined,
+    processExport: async () =>
+      options?.exportProcessResult ?? {
+        case: {
+          id: "case-1",
+          status: "CLOSED",
+        },
+        exportRecord: {
+          id: "export-1",
+          caseId: "case-1",
+          status: "EXPORTED",
+          connectorName: "mock-accounting-export",
+          errorMessage: null,
+        },
+      },
   };
 
   const controller = new CasesController(
@@ -167,7 +192,8 @@ test("CasesController reopens the latest info-requested approval task before ret
     answer: "OPS-12",
   });
 
-  assert.equal(answered.status, "ANSWERED");
+  assert.equal(answered.success, true);
+  assert.equal(answered.data.question.status, "ANSWERED");
   assert.deepEqual(harness.reopenedTasks, ["task-1"]);
   assert.deepEqual(harness.workflowTransitions, [
     {
@@ -221,7 +247,8 @@ test("CasesController reruns policy routing when requester answers the final fin
     answer: "Updated supporting note",
   });
 
-  assert.equal(answered.status, "ANSWERED");
+  assert.equal(answered.success, true);
+  assert.equal(answered.data.question.status, "ANSWERED");
   assert.deepEqual(harness.workflowTransitions, [
     {
       caseId: "case-1",
@@ -245,7 +272,9 @@ test("CasesController send-back keeps finance review visible as a requester clar
     { note: "Please attach the settled amount evidence." },
   );
 
-  assert.equal(result.case.status, "AWAITING_REQUESTER_INFO");
+  assert.equal(result.success, true);
+  assert.equal(result.data.case.status, "AWAITING_REQUESTER_INFO");
+  assert.equal(result.data.review.outcome, "SENT_BACK");
   assert.deepEqual(harness.resolvedReviews, [
     {
       reviewId: "review-1",
@@ -284,13 +313,60 @@ test("CasesController recovers a case from recoverable exception back into polic
 
   assert.deepEqual(harness.recoverCalls, ["case-1"]);
   assert.deepEqual(result, {
-    case: {
-      id: "case-1",
-      status: "AWAITING_APPROVAL",
+    success: true,
+    data: {
+      case: {
+        id: "case-1",
+        status: "AWAITING_APPROVAL",
+      },
+      policyResult: {
+        passed: true,
+        warnings: [],
+        blockingIssues: [],
+        requiresFinanceReview: false,
+        duplicateSignals: [],
+      },
     },
-    actor: {
-      actorId: "configured.finance",
-      actorType: "FINANCE_REVIEWER",
+  });
+});
+
+test("CasesController wraps approval success in the shared action envelope", async () => {
+  const harness = createCasesControllerHarness({
+    approvalTask: {
+      id: "task-1",
+      caseId: "case-1",
     },
+  });
+
+  const result = await harness.controller.approveTask(
+    "task-1",
+    { id: "configured.approver" } as never,
+    { decisionReason: "Approved" },
+  );
+
+  assert.deepEqual(result, {
+    success: true,
+    data: {
+      case: {
+        id: "case-1",
+        status: "EXPORT_READY",
+      },
+      exportRecord: null,
+    },
+  });
+});
+
+test("CasesController wraps export orchestration errors in the shared error envelope", async () => {
+  const harness = createCasesControllerHarness({
+    exportProcessResult: {
+      error: "Case is not ready for export",
+    },
+  });
+
+  const result = await harness.controller.processExport("case-1");
+
+  assert.deepEqual(result, {
+    success: false,
+    error: "Case is not ready for export",
   });
 });

@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 const landingMetrics: Array<{ label: string; value: string; note: string; tone?: string }> = [
   { label: "Total cases", value: "1,284", note: "+12% monthly increase" },
   { label: "Pending approvals", value: "42", note: "8 require immediate action" },
@@ -31,12 +33,12 @@ export default function HomePage() {
             clarification, approvals, finance review, and export.
           </p>
           <div className="hero-actions">
-            <a href="/cases/new" className="button-primary">
+            <Link href="/cases/new" className="button-primary">
               Get started
-            </a>
-            <a href="/dashboard" className="button-secondary">
+            </Link>
+            <Link href="/dashboard" className="button-secondary">
               Open dashboard
-            </a>
+            </Link>
           </div>
         </div>
 
@@ -120,9 +122,9 @@ export default function HomePage() {
               <p className="eyebrow">Recent activity</p>
               <h2>Queue movement</h2>
             </div>
-            <a href="/dashboard" className="accent-copy">
+            <Link href="/dashboard" className="accent-copy">
               View all
-            </a>
+            </Link>
           </div>
           <div className="activity-list">
             {activityItems.map((item) => (
@@ -144,9 +146,9 @@ export default function HomePage() {
           </div>
           <div className="split-actions">
             <p className="muted">Neural engine operating at 99.9% precision with full audit trace continuity.</p>
-            <a href="/finance-review" className="button-secondary">
+            <Link href="/finance-review" className="button-secondary">
               View exceptions
-            </a>
+            </Link>
           </div>
         </article>
 

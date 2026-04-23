@@ -4,10 +4,15 @@ import {
   adminConnectorsResponseSchema,
   adminPolicyConfigSchema,
   adminRoutingConfigSchema,
+  approvalActionResponseSchema,
   approvalQueueItemSchema,
   caseDetailResponseSchema,
+  exportActionResponseSchema,
+  financeReviewActionResponseSchema,
   caseSubmissionResponseSchema,
   financeReviewQueueItemSchema,
+  questionResponseActionResponseSchema,
+  recoverActionResponseSchema,
 } from "./api";
 
 test("caseDetailResponseSchema accepts the current additive case-detail surface", () => {
@@ -260,4 +265,107 @@ test("adminPolicyConfigSchema normalizes legacy lowercase workflow identifiers",
     "EXPENSE_CLAIM",
     "INTERNAL_PAYMENT_REQUEST",
   ]);
+});
+
+test("action response schemas accept the current success envelopes", () => {
+  const questionResponse = questionResponseActionResponseSchema.parse({
+    success: true,
+    data: {
+      question: {
+        id: "question-1",
+        caseId: "case-1",
+        question: "Please provide the project code.",
+        answer: "OPS-12",
+        status: "ANSWERED",
+        source: "APPROVER_REQUEST",
+      },
+    },
+  });
+  const approvalResponse = approvalActionResponseSchema.parse({
+    success: true,
+    data: {
+      case: {
+        id: "case-1",
+        status: "EXPORT_READY",
+      },
+      exportRecord: {
+        id: "export-1",
+        caseId: "case-1",
+        status: "READY",
+        connectorName: "mock-accounting-export",
+        errorMessage: null,
+      },
+    },
+  });
+  const financeReviewResponse = financeReviewActionResponseSchema.parse({
+    success: true,
+    data: {
+      review: {
+        id: "review-1",
+        caseId: "case-1",
+        reviewerId: "finance.reviewer",
+        outcome: "APPROVED",
+        note: "Looks good.",
+      },
+      case: {
+        id: "case-1",
+        status: "EXPORT_READY",
+      },
+      exportRecord: {
+        id: "export-1",
+        caseId: "case-1",
+        status: "READY",
+        connectorName: "mock-accounting-export",
+        errorMessage: null,
+      },
+    },
+  });
+  const exportResponse = exportActionResponseSchema.parse({
+    success: true,
+    data: {
+      case: {
+        id: "case-1",
+        status: "CLOSED",
+      },
+      exportRecord: {
+        id: "export-1",
+        caseId: "case-1",
+        status: "EXPORTED",
+        connectorName: "mock-accounting-export",
+        errorMessage: null,
+      },
+    },
+  });
+  const recoverResponse = recoverActionResponseSchema.parse({
+    success: true,
+    data: {
+      case: {
+        id: "case-1",
+        status: "AWAITING_APPROVAL",
+      },
+      policyResult: {
+        passed: true,
+        warnings: [],
+        blockingIssues: [],
+        requiresFinanceReview: false,
+        duplicateSignals: [],
+      },
+    },
+  });
+
+  assert.equal(questionResponse.success, true);
+  assert.equal(approvalResponse.success, true);
+  assert.equal(financeReviewResponse.success, true);
+  assert.equal(exportResponse.success, true);
+  assert.equal(recoverResponse.success, true);
+});
+
+test("action response schemas accept the shared error envelope", () => {
+  const parsed = approvalActionResponseSchema.parse({
+    success: false,
+    error: "Approval task not found",
+  });
+
+  assert.equal(parsed.success, false);
+  assert.equal(parsed.error, "Approval task not found");
 });

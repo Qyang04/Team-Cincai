@@ -29,6 +29,8 @@ export const adminPolicyConfigSchema = z.object({
   invoiceNumberRequiredForVendorInvoices: z.boolean(),
 });
 export type AdminPolicyConfig = z.infer<typeof adminPolicyConfigSchema>;
+export const adminPolicyConfigUpdateSchema = adminPolicyConfigSchema.partial();
+export type AdminPolicyConfigUpdate = z.infer<typeof adminPolicyConfigUpdateSchema>;
 
 export const adminRoutingConfigSchema = z.object({
   defaultApproverId: z.string().min(1),
@@ -36,6 +38,8 @@ export const adminRoutingConfigSchema = z.object({
   escalationWindowHours: z.number().min(1),
 });
 export type AdminRoutingConfig = z.infer<typeof adminRoutingConfigSchema>;
+export const adminRoutingConfigUpdateSchema = adminRoutingConfigSchema.partial();
+export type AdminRoutingConfigUpdate = z.infer<typeof adminRoutingConfigUpdateSchema>;
 
 export const adminConnectorStatusSchema = z.object({
   connector: z.string().min(1),

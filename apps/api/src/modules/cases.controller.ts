@@ -1,5 +1,15 @@
 import { Body, Controller, Get, Param, Post } from "@nestjs/common";
-import { createCaseSchema, submitCaseSchema, type WorkflowType } from "@finance-ops/shared";
+import {
+  createCaseSchema,
+  submitCaseSchema,
+  type ApprovalActionResponse,
+  type CaseStatus,
+  type ExportActionResponse,
+  type FinanceReviewActionResponse,
+  type QuestionResponseActionResponse,
+  type RecoverActionResponse,
+  type WorkflowType,
+} from "@finance-ops/shared";
 import { ApprovalsService } from "./approvals.service";
 import { ArtifactsService } from "./artifacts.service";
 import { AuditService } from "./audit.service";
@@ -25,6 +35,52 @@ import { Roles } from "./roles.decorator";
 import { StorageService } from "./storage.service";
 import { WorkflowOrchestratorService } from "./workflow-orchestrator.service";
 import { WorkflowService } from "./workflow.service";
+
+function createErrorActionResponse<TResponse extends { success: boolean }>(error: string): TResponse {
+  return {
+    success: false,
+    error,
+  } as unknown as TResponse;
+}
+
+function toCaseStatusSnapshot(input: { id: string; status: CaseStatus }) {
+  return {
+    id: input.id,
+    status: input.status,
+  };
+}
+
+function toExportRecordSnapshot(input: {
+  id: string;
+  caseId: string;
+  status: string;
+  connectorName?: string | null;
+  errorMessage?: string | null;
+}) {
+  return {
+    id: input.id,
+    caseId: input.caseId,
+    status: input.status,
+    connectorName: input.connectorName ?? undefined,
+    errorMessage: input.errorMessage ?? null,
+  };
+}
+
+function toFinanceReviewResolution(input: {
+  id: string;
+  caseId: string;
+  reviewerId?: string | null;
+  outcome?: string | null;
+  note?: string | null;
+}) {
+  return {
+    id: input.id,
+    caseId: input.caseId,
+    reviewerId: input.reviewerId ?? null,
+    outcome: input.outcome ?? null,
+    note: input.note ?? null,
+  };
+}
 
 @Controller("cases")
 export class CasesController {
@@ -158,7 +214,7 @@ export class CasesController {
     body: {
       answer: string;
     },
-  ) {
+  ): Promise<QuestionResponseActionResponse> {
     const input = answerQuestionSchema.parse(body);
     const answered = await this.intakeService.answerQuestion(id, questionId, input.answer);
     const caseRecord = await this.casesService.getCase(id);
@@ -226,7 +282,19 @@ export class CasesController {
       });
     }
 
-    return answered;
+    return {
+      success: true,
+      data: {
+        question: {
+          id: answered.id,
+          caseId: answered.caseId,
+          question: answered.question,
+          answer: answered.answer ?? null,
+          status: answered.status,
+          source: answered.source ?? undefined,
+        },
+      },
+    };
   }
 
   @Get(":id/transitions")
@@ -242,15 +310,6 @@ export class CasesController {
   @Post(":id/policy-review/run")
   runPolicyReview(@Param("id") id: string) {
     return this.workflowOrchestrator.runPolicyAndRoute(id);
-  }
-
-  @Post(":id/recover")
-  @Roles("FINANCE_REVIEWER", "ADMIN")
-  recoverCase(@Param("id") id: string, @CurrentUser() user: AuthenticatedUser) {
-    return this.workflowOrchestrator.recoverCase(id, {
-      actorId: user.id,
-      actorType: user.roles.includes("ADMIN") ? "ADMIN" : "FINANCE_REVIEWER",
-    });
   }
 
   @Get(":id/policy-result")
@@ -270,14 +329,14 @@ export class CasesController {
     @Param("taskId") taskId: string,
     @CurrentUser() user: AuthenticatedUser,
     @Body() body: { decisionReason?: string },
-  ) {
+  ): Promise<ApprovalActionResponse> {
     const input = approvalDecisionSchema.parse({
       approverId: user.id,
       decisionReason: body.decisionReason,
     });
     const task = await this.approvalsService.getTask(taskId);
     if (!task) {
-      return { error: "Approval task not found" };
+      return createErrorActionResponse<ApprovalActionResponse>("Approval task not found");
     }
 
     await this.approvalsService.markApproved(taskId, input.decisionReason);
@@ -298,7 +357,13 @@ export class CasesController {
     });
     const exportRecord = await this.exportsService.ensureExportReady(task.caseId);
 
-    return { case: exportReadyCase, exportRecord };
+    return {
+      success: true,
+      data: {
+        case: toCaseStatusSnapshot(exportReadyCase),
+        exportRecord: exportRecord ? toExportRecordSnapshot(exportRecord) : null,
+      },
+    };
   }
 
   @Post("/approvals/:taskId/reject")
@@ -307,14 +372,14 @@ export class CasesController {
     @Param("taskId") taskId: string,
     @CurrentUser() user: AuthenticatedUser,
     @Body() body: { decisionReason?: string },
-  ) {
+  ): Promise<ApprovalActionResponse> {
     const input = approvalDecisionSchema.parse({
       approverId: user.id,
       decisionReason: body.decisionReason,
     });
     const task = await this.approvalsService.getTask(taskId);
     if (!task) {
-      return { error: "Approval task not found" };
+      return createErrorActionResponse<ApprovalActionResponse>("Approval task not found");
     }
 
     await this.approvalsService.markRejected(taskId, input.decisionReason);
@@ -327,7 +392,12 @@ export class CasesController {
       note: input.decisionReason ?? "Rejected by assigned approver.",
     });
 
-    return { case: rejected };
+    return {
+      success: true,
+      data: {
+        case: toCaseStatusSnapshot(rejected),
+      },
+    };
   }
 
   @Post("/approvals/:taskId/request-info")
@@ -336,14 +406,14 @@ export class CasesController {
     @Param("taskId") taskId: string,
     @CurrentUser() user: AuthenticatedUser,
     @Body() body: { question: string },
-  ) {
+  ): Promise<ApprovalActionResponse> {
     const input = requestInfoSchema.parse({
       approverId: user.id,
       question: body.question,
     });
     const task = await this.approvalsService.getTask(taskId);
     if (!task) {
-      return { error: "Approval task not found" };
+      return createErrorActionResponse<ApprovalActionResponse>("Approval task not found");
     }
 
     await this.approvalsService.requestInfo(taskId, input.question);
@@ -358,7 +428,12 @@ export class CasesController {
 
     await this.intakeService.createQuestion(task.caseId, input.question, "APPROVER_REQUEST");
 
-    return { case: updated };
+    return {
+      success: true,
+      data: {
+        case: toCaseStatusSnapshot(updated),
+      },
+    };
   }
 
   @Get("/finance-review/cases")
@@ -373,13 +448,13 @@ export class CasesController {
     @Param("reviewId") reviewId: string,
     @CurrentUser() user: AuthenticatedUser,
     @Body() body: { note?: string },
-  ) {
+  ): Promise<FinanceReviewActionResponse> {
     const input = financeDecisionSchema.parse({
       reviewerId: user.id,
       note: body.note,
     });
     const review = await this.financeReviewService.resolve(reviewId, input.reviewerId, "APPROVED", input.note);
-    const approved = await this.workflowService.transitionCase({
+    await this.workflowService.transitionCase({
       caseId: review.caseId,
       from: "FINANCE_REVIEW",
       to: "APPROVED",
@@ -395,7 +470,14 @@ export class CasesController {
       note: "Case marked export-ready after finance approval.",
     });
     const exportRecord = await this.exportsService.ensureExportReady(review.caseId);
-    return { review, case: exportReady, exportRecord: exportRecord ?? approved };
+    return {
+      success: true,
+      data: {
+        review: toFinanceReviewResolution(review),
+        case: toCaseStatusSnapshot(exportReady),
+        exportRecord: exportRecord ? toExportRecordSnapshot(exportRecord) : null,
+      },
+    };
   }
 
   @Post("/finance-review/:reviewId/reject")
@@ -404,7 +486,7 @@ export class CasesController {
     @Param("reviewId") reviewId: string,
     @CurrentUser() user: AuthenticatedUser,
     @Body() body: { note?: string },
-  ) {
+  ): Promise<FinanceReviewActionResponse> {
     const input = financeDecisionSchema.parse({
       reviewerId: user.id,
       note: body.note,
@@ -418,7 +500,13 @@ export class CasesController {
       actorId: input.reviewerId,
       note: input.note ?? "Rejected by finance reviewer.",
     });
-    return { review, case: rejected };
+    return {
+      success: true,
+      data: {
+        review: toFinanceReviewResolution(review),
+        case: toCaseStatusSnapshot(rejected),
+      },
+    };
   }
 
   @Post("/finance-review/:reviewId/send-back")
@@ -427,7 +515,7 @@ export class CasesController {
     @Param("reviewId") reviewId: string,
     @CurrentUser() user: AuthenticatedUser,
     @Body() body: { note?: string },
-  ) {
+  ): Promise<FinanceReviewActionResponse> {
     const input = financeDecisionSchema.parse({
       reviewerId: user.id,
       note: body.note,
@@ -442,7 +530,13 @@ export class CasesController {
       note: input.note ?? "Finance reviewer requested more information.",
     });
     await this.intakeService.createQuestion(review.caseId, input.note ?? "Please provide more supporting information.", "FINANCE_REVIEW");
-    return { review, case: updated };
+    return {
+      success: true,
+      data: {
+        review: toFinanceReviewResolution(review),
+        case: toCaseStatusSnapshot(updated),
+      },
+    };
   }
 
   @Get(":id/export")
@@ -451,7 +545,62 @@ export class CasesController {
   }
 
   @Post(":id/export")
-  processExport(@Param("id") id: string) {
-    return this.workflowOrchestrator.processExport(id);
+  async processExport(@Param("id") id: string): Promise<ExportActionResponse> {
+    const result = await this.workflowOrchestrator.processExport(id);
+    if (result && typeof result === "object" && "error" in result) {
+      return createErrorActionResponse<ExportActionResponse>(String(result.error));
+    }
+
+    const successResult = result as {
+      case: { id: string; status: CaseStatus };
+      exportRecord: {
+        id: string;
+        caseId: string;
+        status: string;
+        connectorName?: string | null;
+        errorMessage?: string | null;
+      };
+    };
+
+    return {
+      success: true,
+      data: {
+        case: toCaseStatusSnapshot(successResult.case),
+        exportRecord: toExportRecordSnapshot(successResult.exportRecord),
+      },
+    };
+  }
+
+  @Post(":id/recover")
+  @Roles("FINANCE_REVIEWER", "ADMIN")
+  async recoverCase(@Param("id") id: string, @CurrentUser() user: AuthenticatedUser): Promise<RecoverActionResponse> {
+    const result = await this.workflowOrchestrator.recoverCase(id, {
+      actorId: user.id,
+      actorType: user.roles.includes("ADMIN") ? "ADMIN" : "FINANCE_REVIEWER",
+    });
+    if (result && typeof result === "object" && "error" in result) {
+      return createErrorActionResponse<RecoverActionResponse>(String(result.error));
+    }
+
+    const successResult = result as {
+      case: { id: string; status: CaseStatus };
+      policyResult: {
+        passed: boolean;
+        warnings: string[];
+        blockingIssues: string[];
+        requiresFinanceReview: boolean;
+        duplicateSignals: string[];
+        reconciliationFlags?: string[];
+        approvalRequirement?: string | null;
+      } | null;
+    };
+
+    return {
+      success: true,
+      data: {
+        case: toCaseStatusSnapshot(successResult.case),
+        policyResult: successResult.policyResult,
+      },
+    };
   }
 }

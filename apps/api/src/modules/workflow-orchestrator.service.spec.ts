@@ -23,6 +23,10 @@ function createWorkflowOrchestratorHarness() {
       status: currentStatus,
       workflowType: "EXPENSE_CLAIM",
       requesterId: "demo.requester",
+      assignedTo: null,
+      priority: "MEDIUM",
+      createdAt: new Date("2026-04-22T09:00:00.000Z"),
+      updatedAt: new Date("2026-04-22T10:00:00.000Z"),
     }),
   };
 
@@ -48,7 +52,7 @@ function createWorkflowOrchestratorHarness() {
       filename: artifactId === "artifact-1" ? "receipt.jpg" : "parking.jpg",
       storageUri: `mock://artifacts/${artifactId}.jpg`,
     }),
-    markUploaded: async (_artifactId: string, _storageUri?: string) => undefined,
+    markUploaded: async () => undefined,
     markProcessed: async () => undefined,
   };
 
@@ -110,6 +114,7 @@ function createWorkflowOrchestratorHarness() {
         return aiResult as TResult;
       }
       if (jobName === "run-policy-and-route") {
+        currentStatus = String(policyRouteResult.case.status);
         return policyRouteResult as TResult;
       }
       if (jobName === "process-export") {
@@ -160,7 +165,16 @@ test("WorkflowOrchestratorService submits a draft case through intake and policy
   assert.equal(harness.processedUploads.length, 2);
   assert.equal(harness.persistedIntakeResults.length, 1);
   const routedCase = "case" in result ? result.case : undefined;
-  assert.equal(routedCase?.status, "AWAITING_APPROVAL");
+  assert.deepEqual(routedCase, {
+    id: "case-1",
+    workflowType: "EXPENSE_CLAIM",
+    status: "AWAITING_APPROVAL",
+    requesterId: "demo.requester",
+    assignedTo: null,
+    priority: "MEDIUM",
+    createdAt: "2026-04-22T09:00:00.000Z",
+    updatedAt: "2026-04-22T10:00:00.000Z",
+  });
   assert.deepEqual(result.policyResult, harness.policyRouteResult.policyResult);
   assert.equal(harness.auditEvents[2]?.eventType, "AI_INTAKE_ANALYZED");
 });
@@ -212,7 +226,16 @@ test("WorkflowOrchestratorService returns clarification state when AI intake nee
     ["SUBMITTED", "INTAKE_PROCESSING", "AWAITING_REQUESTER_INFO"],
   );
   const clarifiedCase = "case" in result ? result.case : undefined;
-  assert.equal(clarifiedCase?.status, "AWAITING_REQUESTER_INFO");
+  assert.deepEqual(clarifiedCase, {
+    id: "case-1",
+    workflowType: "EXPENSE_CLAIM",
+    status: "AWAITING_REQUESTER_INFO",
+    requesterId: "demo.requester",
+    assignedTo: null,
+    priority: "MEDIUM",
+    createdAt: "2026-04-22T09:00:00.000Z",
+    updatedAt: "2026-04-22T10:00:00.000Z",
+  });
   assert.equal(result.policyResult, null);
   assert.equal(harness.persistedIntakeResults.length, 1);
   assert.equal(harness.auditEvents[1]?.eventType, "ARTIFACT_UPLOADED");

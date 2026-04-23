@@ -80,16 +80,21 @@ test("ApprovalsService makes a reopened task visible in the pending approval que
     {
       id: "task-1",
       caseId: "case-1",
+      approverId: "manager.approver",
       status: "INFO_REQUESTED",
       decision: "REQUEST_INFO",
       decisionReason: "Please confirm the business purpose.",
+      dueAt: null,
       createdAt: new Date("2026-04-22T08:00:00.000Z"),
+      updatedAt: new Date("2026-04-22T08:00:00.000Z"),
       case: {
         id: "case-1",
         workflowType: "EXPENSE_CLAIM",
         status: "AWAITING_APPROVER_INFO_RESPONSE",
         priority: "MEDIUM",
         requesterId: "demo.requester",
+        createdAt: new Date("2026-04-22T07:55:00.000Z"),
+        updatedAt: new Date("2026-04-22T08:00:00.000Z"),
       },
     },
   ];
@@ -119,16 +124,21 @@ test("ApprovalsService makes a reopened task visible in the pending approval que
   assert.deepEqual(pendingTasks[0], {
     id: "task-1",
     caseId: "case-1",
+    approverId: "manager.approver",
     status: "PENDING",
     decision: null,
     decisionReason: null,
-    createdAt: new Date("2026-04-22T08:00:00.000Z"),
+    dueAt: null,
+    createdAt: "2026-04-22T08:00:00.000Z",
+    updatedAt: "2026-04-22T08:00:00.000Z",
     case: {
       id: "case-1",
       workflowType: "EXPENSE_CLAIM",
       status: "AWAITING_APPROVER_INFO_RESPONSE",
       priority: "MEDIUM",
       requesterId: "demo.requester",
+      createdAt: "2026-04-22T07:55:00.000Z",
+      updatedAt: "2026-04-22T08:00:00.000Z",
     },
   });
 });

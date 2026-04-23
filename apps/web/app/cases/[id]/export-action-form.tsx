@@ -1,5 +1,6 @@
 "use client";
 
+import { exportActionResponseSchema } from "@finance-ops/shared";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -26,6 +27,10 @@ export function ExportActionForm({ caseId }: { caseId: string }) {
 
         if (!response.ok) {
           throw new Error(`Export failed (${response.status}).`);
+        }
+        const result = exportActionResponseSchema.parse(await response.json());
+        if (!result.success) {
+          throw new Error(result.error);
         }
 
         setFeedback({ kind: "success", message: "Export triggered. Refreshing case state..." });

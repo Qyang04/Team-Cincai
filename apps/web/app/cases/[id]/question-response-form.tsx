@@ -1,5 +1,6 @@
 "use client";
 
+import { questionResponseActionResponseSchema } from "@finance-ops/shared";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -36,6 +37,10 @@ export function QuestionResponseForm({ caseId, questionId }: QuestionResponseFor
 
         if (!response.ok) {
           throw new Error(`Failed to submit clarification (${response.status}).`);
+        }
+        const result = questionResponseActionResponseSchema.parse(await response.json());
+        if (!result.success) {
+          throw new Error(result.error);
         }
 
         setFeedback({ kind: "success", message: "Response saved. Refreshing case state..." });
