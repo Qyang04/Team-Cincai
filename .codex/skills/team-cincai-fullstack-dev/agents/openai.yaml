@@ -1,0 +1,4 @@
+interface:
+  display_name: "Team Cincai Full-Stack Dev"
+  short_description: "Repo-aware full-stack monorepo delivery"
+  default_prompt: "Use $team-cincai-fullstack-dev to implement frontend, backend, and shared-contract changes in this SME Finance Ops Copilot repo."
