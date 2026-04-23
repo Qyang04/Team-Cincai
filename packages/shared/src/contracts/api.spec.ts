@@ -6,6 +6,7 @@ import {
   adminRoutingConfigSchema,
   approvalActionResponseSchema,
   approvalQueueItemSchema,
+  caseListResponseSchema,
   caseDetailResponseSchema,
   exportActionResponseSchema,
   financeReviewActionResponseSchema,
@@ -165,6 +166,49 @@ test("approvalQueueItemSchema accepts operator-ready approval queue rows", () =>
   });
 
   assert.equal(parsed.case.status, "AWAITING_APPROVAL");
+});
+
+test("caseListResponseSchema accepts additive case-list rows with artifact metadata", () => {
+  const parsed = caseListResponseSchema.parse([
+    {
+      id: "case-1",
+      workflowType: "EXPENSE_CLAIM",
+      status: "AWAITING_APPROVAL",
+      priority: "MEDIUM",
+      requesterId: "demo.requester",
+      assignedTo: null,
+      createdAt: "2026-04-22T09:00:00.000Z",
+      updatedAt: "2026-04-22T10:00:00.000Z",
+      artifacts: [
+        {
+          id: "artifact-1",
+          caseId: "case-1",
+          type: "RECEIPT",
+          filename: "receipt.jpg",
+          storageUri: "mock://artifacts/case-1/receipt.jpg",
+          extractedText: "Lunch with client",
+          processingStatus: "PROCESSED",
+          errorMessage: null,
+          uploadedAt: "2026-04-22T09:00:30.000Z",
+          processingStartedAt: "2026-04-22T09:00:31.000Z",
+          processingCompletedAt: "2026-04-22T09:00:32.000Z",
+          createdAt: "2026-04-22T09:00:00.000Z",
+          updatedAt: "2026-04-22T09:00:32.000Z",
+        },
+      ],
+    },
+  ]);
+
+  assert.equal(parsed[0]?.artifacts?.[0]?.id, "artifact-1");
+  assert.equal(parsed[0]?.workflowType, "EXPENSE_CLAIM");
+});
+
+test("caseListResponseSchema rejects non-array payloads so UI loaders can fall back safely", () => {
+  assert.throws(() =>
+    caseListResponseSchema.parse({
+      cases: [],
+    }),
+  );
 });
 
 test("financeReviewQueueItemSchema accepts operator-ready finance-review queue rows", () => {

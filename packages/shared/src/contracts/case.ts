@@ -226,6 +226,20 @@ export const exportReadinessSummarySchema = z.object({
 });
 export type ExportReadinessSummary = z.infer<typeof exportReadinessSummarySchema>;
 
+export const caseListItemSchema = caseSummarySchema.extend({
+  artifacts: z
+    .array(
+      caseArtifactSchema.pick({
+        id: true,
+      }),
+    )
+    .optional(),
+});
+export type CaseListItem = z.infer<typeof caseListItemSchema>;
+
+export const caseListResponseSchema = z.array(caseListItemSchema);
+export type CaseListResponse = z.infer<typeof caseListResponseSchema>;
+
 export const caseDetailResponseSchema = caseSummarySchema.extend({
   stage: z.enum(caseStatuses),
   manualActionRequired: z.boolean(),

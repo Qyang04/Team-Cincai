@@ -1,4 +1,4 @@
-import { DEFAULT_API_BASE_URL } from "@finance-ops/shared";
+import { DEFAULT_API_BASE_URL, caseListResponseSchema, type CaseListItem } from "@finance-ops/shared";
 import Link from "next/link";
 import { fetchApiJson } from "../lib/server-api";
 
@@ -6,16 +6,6 @@ const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
 const dashboardHeaders = {
   "x-mock-role": "ADMIN",
   "x-mock-user-id": "admin.user",
-};
-
-type CaseListItem = {
-  id: string;
-  workflowType: string;
-  status: string;
-  priority: string;
-  requesterId: string;
-  createdAt: string;
-  artifacts?: Array<{ id: string }>;
 };
 
 async function getCases(): Promise<{ cases: CaseListItem[]; isLive: boolean; errorMessage: string | null }> {
@@ -27,6 +17,7 @@ async function getCases(): Promise<{ cases: CaseListItem[]; isLive: boolean; err
     },
     fallbackData: [],
     resourceLabel: "Case list",
+    parse: (value) => caseListResponseSchema.parse(value),
   });
 
   return {

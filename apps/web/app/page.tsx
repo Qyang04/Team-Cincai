@@ -1,22 +1,4 @@
-import { DEFAULT_API_BASE_URL } from "@finance-ops/shared";
 import Link from "next/link";
-import { fetchApiJson } from "./lib/server-api";
-
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
-const dashboardHeaders = {
-  "x-mock-role": "ADMIN",
-  "x-mock-user-id": "admin.user",
-};
-
-type CaseListItem = {
-  id: string;
-  workflowType: string;
-  status: string;
-  priority: string;
-  requesterId: string;
-  createdAt: string;
-  artifacts?: Array<{ id: string }>;
-};
 
 const workflowSteps = [
   { title: "Input", copy: "Receipts, invoices, screenshots, and ad-hoc requester notes." },
@@ -25,78 +7,21 @@ const workflowSteps = [
   { title: "Finalization", copy: "Export payloads, audit logging, and recoverable exception handling." },
 ] as const;
 
-async function getCases(): Promise<{ cases: CaseListItem[]; isLive: boolean; errorMessage: string | null }> {
-  const result = await fetchApiJson<CaseListItem[]>({
-    url: `${apiBaseUrl}/cases`,
-    init: {
-      cache: "no-store",
-      headers: dashboardHeaders,
-    },
-    fallbackData: [],
-    resourceLabel: "Case list",
-  });
+const landingMetrics: Array<{ label: string; value: string; note: string; tone?: string }> = [
+  { label: "Case intake", value: "Live route", note: "Submit a new request from the requester flow." },
+  { label: "Approval lane", value: "Live route", note: "Review manager decisions and follow-up questions." },
+  { label: "Finance review", value: "Live route", note: "Resolve escalations before export." },
+  { label: "Audit trail", value: "Visible", note: "Inspect state transitions on each case detail page." },
+];
 
-  return {
-    cases: result.data,
-    isLive: result.ok,
-    errorMessage: result.ok ? null : result.message,
-  };
-}
+const activityItems = [
+  { title: "Submit a new case", copy: "Start from the requester flow and attach example evidence.", status: "Requester" },
+  { title: "Review routing", copy: "Use the dashboard and case detail views to confirm the chosen workflow state.", status: "Operations" },
+  { title: "Approve or escalate", copy: "Move the case through approval or finance review with recorded rationale.", status: "Control" },
+  { title: "Export and verify", copy: "Confirm the final state and export handoff remain visible in the audit trail.", status: "Completion" },
+] as const;
 
-function humanizeValue(value: string): string {
-  return value
-    .replace(/_/g, " ")
-    .toLowerCase()
-    .replace(/\b\w/g, (char) => char.toUpperCase());
-}
-
-function formatRelative(dateString: string): string {
-  const diffMs = Date.now() - new Date(dateString).getTime();
-  const diffHours = Math.round(diffMs / (1000 * 60 * 60));
-
-  if (Math.abs(diffHours) < 1) {
-    return "just now";
-  }
-
-  if (diffHours < 24) {
-    return `${diffHours}h ago`;
-  }
-
-  const diffDays = Math.round(diffHours / 24);
-  return `${diffDays}d ago`;
-}
-
-export default async function HomePage() {
-  const { cases, isLive, errorMessage } = await getCases();
-  const recentCases = cases.slice(0, 4);
-  const activeCases = cases.filter((item) => item.status !== "CLOSED").length;
-  const awaitingRequesterInfo = cases.filter((item) => item.status === "AWAITING_REQUESTER_INFO").length;
-  const awaitingApproval = cases.filter(
-    (item) => item.status === "AWAITING_APPROVAL" || item.status === "AWAITING_APPROVER_INFO_RESPONSE",
-  ).length;
-  const financeReview = cases.filter((item) => item.status === "FINANCE_REVIEW").length;
-  const exportReady = cases.filter((item) => item.status === "EXPORT_READY").length;
-  const landingMetrics: Array<{ label: string; value: string; note: string; tone?: string }> = isLive
-    ? [
-        { label: "Total cases", value: String(cases.length), note: "Live count from the current case list" },
-        { label: "Active cases", value: String(activeCases), note: "Cases still moving through the workflow" },
-        { label: "Awaiting approval", value: String(awaitingApproval), note: "Includes approver follow-up states" },
-        {
-          label: "Finance review",
-          value: String(financeReview),
-          note: exportReady
-            ? `${exportReady} case${exportReady === 1 ? "" : "s"} already marked export-ready`
-            : "No cases are currently marked export-ready",
-          tone: financeReview > 0 ? "metric-critical" : undefined,
-        },
-      ]
-    : [
-        { label: "Case data", value: "Unavailable", note: errorMessage ?? `Start the API at ${apiBaseUrl} to load live summaries.` },
-        { label: "Dashboard", value: "Ready", note: "Navigation works, but route summaries depend on live API data." },
-        { label: "Approvals", value: "Live route", note: "Use the approval lane for real action handling." },
-        { label: "Finance review", value: "Live route", note: "Use the finance review queue for escalated cases." },
-      ];
-
+export default function HomePage() {
   return (
     <div className="workspace fade-up">
       <section className="landing-hero">
@@ -108,7 +33,7 @@ export default async function HomePage() {
             route through approval or finance review, and keep the audit trail visible end to end.
           </p>
           <p className="muted">
-            The hero and case summaries are based on live API data when available. The workflow pipeline below is illustrative.
+            This overview is intentionally static. Use the dashboard and queue routes for live runtime data.
           </p>
           <div className="hero-actions">
             <Link href="/cases/new" className="button-primary">
@@ -124,57 +49,45 @@ export default async function HomePage() {
           <div className="hero-panel hero-panel-dark">
             <div className="metric-head">
               <div>
-                <p className="eyebrow">Live orchestration</p>
-                <h2>Current case activity</h2>
+                <p className="eyebrow">Demo workflow</p>
+                <h2>Case-driven operating model</h2>
               </div>
-              <span className={`inline-status${isLive ? " inline-status-success" : ""}`}>
-                {isLive ? "Live data" : "API unavailable"}
-              </span>
+              <span className="inline-status">Sample path</span>
             </div>
             <div className="hero-flow">
-              {recentCases.length ? (
-                recentCases.map((item) => (
-                  <div key={item.id} className="hero-flow-row">
-                    <strong>{humanizeValue(item.workflowType)}</strong>
-                    <span className="muted">{humanizeValue(item.status)}</span>
-                  </div>
-                ))
-              ) : (
-                <div className="hero-flow-row">
-                  <strong>{isLive ? "No cases yet" : "Case feed unavailable"}</strong>
-                  <span className="muted">
-                    {isLive
-                      ? "Create a case to populate the live workflow summary."
-                      : `Start the API at ${apiBaseUrl} to populate the live workflow summary.`}
-                  </span>
-                </div>
-              )}
+              <div className="hero-flow-row">
+                <strong>Expense claim</strong>
+                <span className="muted">Clarification in progress</span>
+              </div>
+              <div className="hero-flow-row">
+                <strong>Vendor invoice</strong>
+                <span className="muted">Approval ready</span>
+              </div>
+              <div className="hero-flow-row">
+                <strong>Internal payment</strong>
+                <span className="muted">Finance review triggered</span>
+              </div>
+              <div className="hero-flow-row">
+                <strong>Petty cash</strong>
+                <span className="muted">Export payload prepared</span>
+              </div>
             </div>
           </div>
 
           <div className="hero-metrics">
             <article className="hero-panel">
-              <p className="eyebrow">Awaiting requester info</p>
-              <div className="metric-number">{isLive ? awaitingRequesterInfo : "0"}</div>
-              <p className="muted">Cases paused for clarification before routing can continue.</p>
+              <p className="eyebrow">Requester flow</p>
+              <div className="metric-number">1</div>
+              <p className="muted">Create a case, upload evidence, and submit into the workflow.</p>
             </article>
             <article className="hero-panel">
-              <p className="eyebrow">Recent cases</p>
-              <div className="metric-number">{isLive ? recentCases.length : "0"}</div>
-              <p className="muted">The overview reflects the latest cases returned by the API.</p>
+              <p className="eyebrow">Operator views</p>
+              <div className="metric-number">3</div>
+              <p className="muted">Dashboard, approvals, and finance review cover the live control surface.</p>
             </article>
           </div>
         </div>
       </section>
-
-      {!isLive && errorMessage ? (
-        <section className="notice">
-          <strong>Live dashboard data failed to load.</strong>
-          <p className="muted">
-            {errorMessage} Expected API base URL: <code>{apiBaseUrl}</code>.
-          </p>
-        </section>
-      ) : null}
 
       <section className="landing-summary">
         {landingMetrics.map((metric) => (
@@ -210,35 +123,21 @@ export default async function HomePage() {
         <article className="activity-panel">
           <div className="surface-head">
             <div>
-              <p className="eyebrow">Recent cases</p>
-              <h2>Latest queue movement</h2>
+              <p className="eyebrow">Suggested walkthrough</p>
+              <h2>How to inspect the live system</h2>
             </div>
             <Link href="/dashboard" className="accent-copy">
-              View all
+              Open dashboard
             </Link>
           </div>
           <div className="activity-list">
-            {recentCases.length ? (
-              recentCases.map((item) => (
-                <div key={item.id} className="activity-row">
-                  <strong>{humanizeValue(item.workflowType)}</strong>
-                  <p className="muted">
-                    Case {item.id} opened by {item.requesterId} {formatRelative(item.createdAt)}.
-                  </p>
-                  <span className="inline-status">{humanizeValue(item.status)}</span>
-                </div>
-              ))
-            ) : (
-              <div className="activity-row">
-                <strong>{isLive ? "No live cases yet" : "Recent cases unavailable"}</strong>
-                <p className="muted">
-                  {isLive
-                    ? "Submit a case to replace this placeholder state with recent workflow activity."
-                    : `The landing page could not load the case list from ${apiBaseUrl}.`}
-                </p>
-                <span className="inline-status">{isLive ? "Empty queue" : "API unavailable"}</span>
+            {activityItems.map((item) => (
+              <div key={item.title} className="activity-row">
+                <strong>{item.title}</strong>
+                <p className="muted">{item.copy}</p>
+                <span className="inline-status">{item.status}</span>
               </div>
-            )}
+            ))}
           </div>
         </article>
       </section>
