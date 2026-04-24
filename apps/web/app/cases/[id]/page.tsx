@@ -302,12 +302,22 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
                   {artifact.uploadedAt ? (
                     <div className="muted">Uploaded: {new Date(artifact.uploadedAt).toLocaleString()}</div>
                   ) : null}
+                  {typeof artifact.metadata?.extractionMethod === "string" ? (
+                    <div className="muted">Extraction method: {humanizeKey(String(artifact.metadata.extractionMethod))}</div>
+                  ) : null}
+                  {artifact.source ? <div className="muted">Source: {artifact.source}</div> : null}
                   {artifact.processingCompletedAt ? (
                     <div className="muted">
                       Processed: {new Date(artifact.processingCompletedAt).toLocaleString()}
                     </div>
                   ) : null}
                   {artifact.extractedText ? <div className="muted">Extracted: {artifact.extractedText}</div> : null}
+                  {Array.isArray(artifact.metadata?.extractionWarnings) &&
+                  artifact.metadata.extractionWarnings.length > 0 ? (
+                    <div className="muted">
+                      Warnings: {artifact.metadata.extractionWarnings.map((warning) => String(warning)).join("; ")}
+                    </div>
+                  ) : null}
                   {artifact.errorMessage ? <div className="text-danger">Error: {artifact.errorMessage}</div> : null}
                   {artifact.processingStatus === "FAILED" ? (
                     <ArtifactRetryForm caseId={caseDetail.id} artifactId={artifact.id} />
@@ -378,7 +388,19 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
                   <p className="detail-label">Duplicate signals</p>
                   <p>{latestPolicy.duplicateSignals.length}</p>
                 </div>
+                <div>
+                  <p className="detail-label">Reconciliation flags</p>
+                  <p>{latestPolicy.reconciliationFlags?.length ?? 0}</p>
+                </div>
               </div>
+              {latestPolicy.approvalRequirement ? (
+                <>
+                  <p className="detail-label" style={{ marginTop: 16 }}>
+                    Approval requirement
+                  </p>
+                  <p className="muted">{humanizeKey(latestPolicy.approvalRequirement)}</p>
+                </>
+              ) : null}
               {latestPolicy.warnings.length ? (
                 <>
                   <p className="detail-label" style={{ marginTop: 16 }}>
@@ -411,6 +433,18 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
                   <ul className="muted clean-list">
                     {latestPolicy.duplicateSignals.map((signal) => (
                       <li key={signal}>{signal}</li>
+                    ))}
+                  </ul>
+                </>
+              ) : null}
+              {latestPolicy.reconciliationFlags?.length ? (
+                <>
+                  <p className="detail-label" style={{ marginTop: 16 }}>
+                    Reconciliation flags
+                  </p>
+                  <ul className="muted clean-list">
+                    {latestPolicy.reconciliationFlags.map((flag) => (
+                      <li key={flag}>{humanizeKey(flag)}</li>
                     ))}
                   </ul>
                 </>

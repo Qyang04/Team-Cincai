@@ -41,6 +41,7 @@ export const extractionResultSchema = z.object({
   confidence: z.number(),
   provenance: z.record(z.string(), z.string()),
   openQuestions: z.array(z.string()),
+  modelMetadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const policyCheckResultSchema = z.object({

@@ -137,6 +137,22 @@ export class WorkflowOrchestratorService {
       filenamesForIntake = ready.map((artifact) => artifact.filename);
     }
 
+    const intakeArtifacts = (await this.artifactsService.listForCase(caseId))
+      .filter((artifact) => artifact.processingStatus !== "FAILED")
+      .map((artifact) => ({
+        id: artifact.id,
+        filename: artifact.filename,
+        mimeType: artifact.mimeType,
+        source: artifact.source,
+        extractedText: artifact.extractedText,
+        processingStatus: artifact.processingStatus,
+        checksum: artifact.checksum,
+        metadata:
+          artifact.metadata && typeof artifact.metadata === "object"
+            ? (artifact.metadata as Record<string, unknown>)
+            : null,
+      }));
+
     await this.workflowService.transitionCase({
       caseId,
       from: existing.status,
@@ -157,7 +173,21 @@ export class WorkflowOrchestratorService {
     });
 
     const aiResult = await this.jobRunner.dispatch<
-      { caseId: string; workflowType: typeof existing.workflowType; notes?: string; filenames: string[] },
+      {
+        caseId: string;
+        workflowType: typeof existing.workflowType;
+        notes?: string;
+        artifacts: Array<{
+          id: string;
+          filename: string;
+          mimeType?: string | null;
+          source?: string | null;
+          extractedText?: string | null;
+          processingStatus: string;
+          checksum?: string | null;
+          metadata?: Record<string, unknown> | null;
+        }>;
+      },
       AiIntakeResult
     >(
       queueNames.aiIntake,
@@ -166,7 +196,7 @@ export class WorkflowOrchestratorService {
         caseId,
         workflowType: existing.workflowType,
         notes: input.notes,
-        filenames: filenamesForIntake,
+        artifacts: intakeArtifacts,
       },
     );
 
@@ -186,6 +216,18 @@ export class WorkflowOrchestratorService {
       payload: {
         notes: input.notes ?? null,
         filenames: filenamesForIntake,
+        artifacts: intakeArtifacts.map((artifact) => ({
+          id: artifact.id,
+          filename: artifact.filename,
+          source: artifact.source ?? null,
+          extractionMethod:
+            typeof artifact.metadata?.extractionMethod === "string" ? artifact.metadata.extractionMethod : null,
+          extractionWarnings: Array.isArray(artifact.metadata?.extractionWarnings)
+            ? artifact.metadata.extractionWarnings
+            : [],
+          hasExtractedText: Boolean(artifact.extractedText),
+          processingStatus: artifact.processingStatus,
+        })),
         extraction: aiResult.extraction,
         decision: aiResult.decision,
       },

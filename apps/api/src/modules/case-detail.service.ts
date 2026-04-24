@@ -22,6 +22,7 @@ type AuditEventLike = {
 type PolicyResultLike = {
   blockingIssues?: unknown;
   duplicateSignals?: unknown;
+  reconciliationFlags?: unknown;
 };
 
 type ExportRecordLike = {
@@ -90,24 +91,59 @@ function getRecommendedAction(status: string, aiRecommendedAction: string | null
   }
 }
 
+const downstreamOrTerminalStatuses = new Set([
+  "APPROVED",
+  "EXPORT_READY",
+  "EXPORTING",
+  "EXPORTED",
+  "REJECTED",
+  "CLOSED",
+]);
+
+const policyHoldStatuses = new Set([
+  "POLICY_REVIEW",
+  "AWAITING_REQUESTER_INFO",
+  "AWAITING_APPROVAL",
+  "AWAITING_APPROVER_INFO_RESPONSE",
+  "FINANCE_REVIEW",
+]);
+
 function getFailureMode(
   status: string,
   artifacts: ArtifactLike[],
   latestPolicyResult: PolicyResultLike | null,
   latestExportRecord: ExportRecordLike | null,
 ) {
-  if (latestExportRecord?.errorMessage) {
+  // Export failure only surfaces while the case is actually stuck on an export attempt.
+  // Once a reviewer recovers the case back toward EXPORT_READY (or it has already exported),
+  // the stored errorMessage is historical and must not be shown as a live failure.
+  if (
+    latestExportRecord?.errorMessage &&
+    (status === "RECOVERABLE_EXCEPTION" || latestExportRecord.status === "FAILED") &&
+    status !== "EXPORT_READY" &&
+    status !== "EXPORTING" &&
+    status !== "EXPORTED" &&
+    status !== "CLOSED"
+  ) {
     return "EXPORT_FAILURE";
   }
 
-  if (artifacts.some((artifact) => artifact.processingStatus === "FAILED")) {
+  // Artifact processing failure is only relevant while the case still depends on that artifact.
+  // After the case has moved to approval/export/terminal states, a stale FAILED row is historical.
+  if (
+    !downstreamOrTerminalStatuses.has(status) &&
+    artifacts.some((artifact) => artifact.processingStatus === "FAILED")
+  ) {
     return "ARTIFACT_PROCESSING_FAILURE";
   }
 
   const blockingIssues = Array.isArray(latestPolicyResult?.blockingIssues)
     ? latestPolicyResult?.blockingIssues
     : [];
-  if (blockingIssues.length > 0) {
+  // A policy row with blocking issues is only a live failure while the case is still held by policy
+  // or upstream review. Once a finance reviewer has overridden it forward (APPROVED, EXPORT_READY, ...)
+  // or the case is rejected/closed, the row is historical and must not block/confuse the UI.
+  if (blockingIssues.length > 0 && policyHoldStatuses.has(status)) {
     return "POLICY_BLOCKED";
   }
 
@@ -116,6 +152,13 @@ function getFailureMode(
     : [];
   if (duplicateSignals.length > 0 && status === "FINANCE_REVIEW") {
     return "DUPLICATE_SIGNAL";
+  }
+
+  const reconciliationFlags = Array.isArray(latestPolicyResult?.reconciliationFlags)
+    ? latestPolicyResult?.reconciliationFlags
+    : [];
+  if (reconciliationFlags.length > 0 && policyHoldStatuses.has(status)) {
+    return "RECONCILIATION_REVIEW";
   }
 
   return null;
@@ -295,6 +338,7 @@ export class CaseDetailService {
             fieldsJson: latestExtraction.fieldsJson as Record<string, string | number | boolean | null>,
             confidence: latestExtraction.confidence,
             provenance: (latestExtraction.provenance as Record<string, string> | null | undefined) ?? null,
+            modelMetadata: (latestExtraction.modelMetadata as Record<string, unknown> | null | undefined) ?? null,
             createdAt: toIsoDateTimeString(latestExtraction.createdAt),
           }
         : null,
@@ -307,8 +351,8 @@ export class CaseDetailService {
             blockingIssues: latestPolicyResult.blockingIssues,
             requiresFinanceReview: latestPolicyResult.requiresFinanceReview,
             duplicateSignals: latestPolicyResult.duplicateSignals,
-            reconciliationFlags: undefined,
-            approvalRequirement: undefined,
+            reconciliationFlags: latestPolicyResult.reconciliationFlags ?? undefined,
+            approvalRequirement: latestPolicyResult.approvalRequirement ?? null,
             createdAt: toIsoDateTimeString(latestPolicyResult.createdAt),
           }
         : null,
@@ -391,10 +435,13 @@ export class CaseDetailService {
         id: artifact.id,
         caseId: artifact.caseId,
         type: artifact.type,
+        source: artifact.source ?? null,
         filename: artifact.filename,
         mimeType: artifact.mimeType,
         storageUri: artifact.storageUri,
         extractedText: artifact.extractedText,
+        checksum: artifact.checksum ?? null,
+        metadata: (artifact.metadata as Record<string, unknown> | null | undefined) ?? null,
         processingStatus: artifact.processingStatus,
         errorMessage: artifact.errorMessage,
         uploadedAt: toNullableIsoDateTimeString(artifact.uploadedAt),
@@ -409,6 +456,7 @@ export class CaseDetailService {
         fieldsJson: result.fieldsJson as Record<string, string | number | boolean | null>,
         confidence: result.confidence,
         provenance: (result.provenance as Record<string, string> | null | undefined) ?? null,
+        modelMetadata: (result.modelMetadata as Record<string, unknown> | null | undefined) ?? null,
         createdAt: toIsoDateTimeString(result.createdAt),
       })),
       openQuestions: caseDetail.openQuestions.map((question) => ({
@@ -429,8 +477,8 @@ export class CaseDetailService {
         blockingIssues: result.blockingIssues,
         requiresFinanceReview: result.requiresFinanceReview,
         duplicateSignals: result.duplicateSignals,
-        reconciliationFlags: undefined,
-        approvalRequirement: undefined,
+        reconciliationFlags: result.reconciliationFlags ?? undefined,
+        approvalRequirement: result.approvalRequirement ?? null,
         createdAt: toIsoDateTimeString(result.createdAt),
       })),
       approvalTasks: caseDetail.approvalTasks.map((task) => ({

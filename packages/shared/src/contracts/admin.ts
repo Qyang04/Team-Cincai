@@ -26,6 +26,7 @@ export const adminPolicyConfigSchema = z.object({
   managerApprovalThreshold: z.number().min(0),
   requireProjectCodeWorkflows: z.array(workflowTypeIdentifierSchema),
   duplicateFilenameDetection: z.boolean(),
+  duplicateEvidenceDetection: z.boolean(),
   invoiceNumberRequiredForVendorInvoices: z.boolean(),
 });
 export type AdminPolicyConfig = z.infer<typeof adminPolicyConfigSchema>;

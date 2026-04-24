@@ -19,6 +19,7 @@ test("CaseDetailService returns additive summary fields alongside the existing n
       fieldsJson: {},
       confidence: 0.82,
       provenance: {},
+      modelMetadata: null,
       createdAt: "2026-04-22T09:01:00.000Z",
     }],
     openQuestions: [{
@@ -134,8 +135,6 @@ test("CaseDetailService returns additive summary fields alongside the existing n
   assert.deepEqual(detail?.latestExtraction, caseRecord.extractionResults[0]);
   assert.deepEqual(detail?.latestPolicyResult, {
     ...caseRecord.policyResults[0],
-    reconciliationFlags: undefined,
-    approvalRequirement: undefined,
   });
   assert.deepEqual(detail?.latestApprovalTask, caseRecord.approvalTasks[0]);
   assert.deepEqual(detail?.latestFinanceReview, caseRecord.financeReviews[0]);
@@ -197,6 +196,98 @@ test("CaseDetailService marks export-ready cases as not requiring manual action"
     summary: "Case is ready for export.",
   });
   assert.equal(detail?.latestExportRecord, null);
+});
+
+test("CaseDetailService clears stale POLICY_BLOCKED banner once finance-review override has advanced the case to EXPORT_READY", async () => {
+  const prisma = {
+    case: {
+      findUnique: async () => ({
+        id: "case-override",
+        workflowType: "EXPENSE_CLAIM",
+        status: "EXPORT_READY",
+        requesterId: "demo.requester",
+        assignedTo: null,
+        priority: "MEDIUM",
+        createdAt: "2026-04-22T09:00:00.000Z",
+        updatedAt: "2026-04-22T12:00:00.000Z",
+        artifacts: [],
+        extractionResults: [],
+        openQuestions: [],
+        policyResults: [
+          {
+            id: "policy-stale",
+            caseId: "case-override",
+            passed: false,
+            warnings: [],
+            blockingIssues: ["Project code is required before approval."],
+            requiresFinanceReview: true,
+            duplicateSignals: [],
+            reconciliationFlags: ["MISSING_PROJECT_CODE"],
+            approvalRequirement: "CLARIFICATION_REQUIRED",
+            createdAt: "2026-04-22T09:02:00.000Z",
+          },
+        ],
+        approvalTasks: [],
+        financeReviews: [
+          {
+            id: "review-override",
+            caseId: "case-override",
+            reviewerId: "finance.reviewer",
+            outcome: "APPROVED",
+            note: "Override: project code resolved offline.",
+            createdAt: "2026-04-22T11:00:00.000Z",
+            updatedAt: "2026-04-22T11:00:00.000Z",
+          },
+        ],
+        exportRecords: [],
+        workflowTransitions: [
+          {
+            id: "t1",
+            caseId: "case-override",
+            fromStatus: "POLICY_REVIEW",
+            toStatus: "FINANCE_REVIEW",
+            actorType: "SYSTEM",
+            actorId: null,
+            note: null,
+            createdAt: "2026-04-22T09:03:00.000Z",
+          },
+          {
+            id: "t2",
+            caseId: "case-override",
+            fromStatus: "FINANCE_REVIEW",
+            toStatus: "APPROVED",
+            actorType: "FINANCE_REVIEWER",
+            actorId: "finance.reviewer",
+            note: null,
+            createdAt: "2026-04-22T11:00:00.000Z",
+          },
+          {
+            id: "t3",
+            caseId: "case-override",
+            fromStatus: "APPROVED",
+            toStatus: "EXPORT_READY",
+            actorType: "SYSTEM",
+            actorId: null,
+            note: null,
+            createdAt: "2026-04-22T11:00:01.000Z",
+          },
+        ],
+        auditEvents: [],
+      }),
+    },
+  };
+
+  const service = new CaseDetailService(prisma as never);
+  const detail = await service.getCaseDetail("case-override");
+
+  assert.equal(detail?.status, "EXPORT_READY");
+  assert.equal(detail?.failureMode, null);
+  assert.equal(detail?.recommendedAction, "run_export");
+  assert.deepEqual(detail?.exportReadinessSummary, {
+    ready: true,
+    status: "READY",
+    summary: "Case is ready for export.",
+  });
 });
 
 test("CaseDetailService derives export failure mode and recovery guidance from recoverable exception cases", async () => {

@@ -1,5 +1,19 @@
 import { Injectable } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "./prisma.service";
+
+function detectArtifactSource(storageUri?: string): string {
+  if (!storageUri) {
+    return "MANUAL";
+  }
+  if (storageUri.startsWith("local://")) {
+    return "UPLOAD";
+  }
+  if (storageUri.startsWith("mock://")) {
+    return "MOCK";
+  }
+  return "REMOTE";
+}
 
 @Injectable()
 export class ArtifactsService {
@@ -15,6 +29,7 @@ export class ArtifactsService {
         filename: input.filename,
         mimeType: input.mimeType,
         storageUri: input.storageUri,
+        source: detectArtifactSource(input.storageUri),
         processingStatus: "PREPARED",
       },
     });
@@ -37,6 +52,7 @@ export class ArtifactsService {
             filename,
             mimeType: defaults?.mimeType,
             storageUri: defaults?.storagePrefix ? `${defaults.storagePrefix}/${filename}` : undefined,
+            source: detectArtifactSource(defaults?.storagePrefix ? `${defaults.storagePrefix}/${filename}` : undefined),
             processingStatus: defaults?.processingStatus ?? "PREPARED",
           },
         }),
@@ -60,6 +76,7 @@ export class ArtifactsService {
   async markUploaded(artifactId: string, storageUri?: string) {
     const data = {
       storageUri: storageUri ?? undefined,
+      source: detectArtifactSource(storageUri),
       processingStatus: "UPLOADED",
       uploadedAt: new Date(),
       errorMessage: null,
@@ -84,10 +101,19 @@ export class ArtifactsService {
     });
   }
 
-  async markProcessed(artifactId: string, extractedText: string) {
+  async markProcessed(
+    artifactId: string,
+    input: {
+      extractedText: string;
+      checksum?: string | null;
+      metadata?: Record<string, unknown> | null;
+    },
+  ) {
     const data = {
       processingStatus: "PROCESSED",
-      extractedText,
+      extractedText: input.extractedText,
+      checksum: input.checksum ?? null,
+      metadata: (input.metadata ?? Prisma.JsonNull) as Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput,
       processingCompletedAt: new Date(),
       errorMessage: null,
     };

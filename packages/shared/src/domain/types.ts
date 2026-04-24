@@ -30,6 +30,7 @@ export type ExtractionResult = {
   confidence: number;
   provenance: Record<string, string>;
   openQuestions: string[];
+  modelMetadata?: Record<string, unknown>;
 };
 
 export type PolicyCheckResult = {

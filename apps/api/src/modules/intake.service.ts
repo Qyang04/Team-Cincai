@@ -15,6 +15,7 @@ export class IntakeService {
           fieldsJson: extraction.fields as Prisma.InputJsonValue,
           confidence: extraction.confidence,
           provenance: extraction.provenance as Prisma.InputJsonValue,
+          modelMetadata: (extraction.modelMetadata ?? null) as Prisma.InputJsonValue,
         },
       });
 

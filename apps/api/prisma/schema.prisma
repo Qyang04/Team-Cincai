@@ -130,10 +130,13 @@ model Artifact {
   id               String       @id @default(uuid())
   caseId           String
   type             ArtifactType @default(OTHER)
+  source           String?
   filename         String
   mimeType         String?
   storageUri       String?
   extractedText    String?
+  checksum         String?
+  metadata         Json?
   processingStatus String       @default("PREPARED")
   errorMessage     String?
   uploadedAt       DateTime?
@@ -173,6 +176,7 @@ model ExtractionResult {
   fieldsJson   Json
   confidence   Float
   provenance   Json
+  modelMetadata Json?
   createdAt    DateTime @default(now())
   case         Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
 }
@@ -197,6 +201,8 @@ model PolicyResult {
   blockingIssues      Json
   requiresFinanceReview Boolean @default(false)
   duplicateSignals    Json
+  reconciliationFlags Json?
+  approvalRequirement String?
   createdAt           DateTime @default(now())
   case                Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
 }

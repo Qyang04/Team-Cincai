@@ -47,7 +47,16 @@ export class WorkflowExecutionService implements OnModuleInit {
   async handleAiIntake(payload: {
     workflowType: "EXPENSE_CLAIM" | "PETTY_CASH_REIMBURSEMENT" | "VENDOR_INVOICE_APPROVAL" | "INTERNAL_PAYMENT_REQUEST";
     notes?: string;
-    filenames: string[];
+    artifacts: Array<{
+      id: string;
+      filename: string;
+      mimeType?: string | null;
+      source?: string | null;
+      extractedText?: string | null;
+      processingStatus: string;
+      checksum?: string | null;
+      metadata?: Record<string, unknown> | null;
+    }>;
   }) {
     this.telemetry.increment("ai.intake.jobs");
     return this.aiGatewayService.analyzeIntake(payload);
@@ -69,6 +78,18 @@ export class WorkflowExecutionService implements OnModuleInit {
       actorType: "SYSTEM",
       payload: policyResult as unknown as Record<string, unknown>,
     });
+
+    if (policyResult.duplicateSignals.length > 0) {
+      await this.auditService.recordEvent({
+        caseId: payload.caseId,
+        eventType: "POLICY_DUPLICATE_SIGNAL_RAISED",
+        actorType: "SYSTEM",
+        payload: {
+          duplicateSignals: policyResult.duplicateSignals,
+          approvalRequirement: policyResult.approvalRequirement ?? null,
+        },
+      });
+    }
 
     if (!policyResult.passed || policyResult.requiresFinanceReview) {
       const updated = await this.workflowService.transitionCase({

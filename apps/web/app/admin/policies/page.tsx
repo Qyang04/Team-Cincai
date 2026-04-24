@@ -25,6 +25,7 @@ const fallbackPolicy: AdminPolicyConfig = {
     "INTERNAL_PAYMENT_REQUEST",
   ],
   duplicateFilenameDetection: true,
+  duplicateEvidenceDetection: true,
   invoiceNumberRequiredForVendorInvoices: true,
 };
 

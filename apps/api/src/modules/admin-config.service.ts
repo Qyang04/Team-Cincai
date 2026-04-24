@@ -24,6 +24,7 @@ const DEFAULT_POLICY_CONFIG: AdminPolicyConfig = {
     "INTERNAL_PAYMENT_REQUEST",
   ],
   duplicateFilenameDetection: true,
+  duplicateEvidenceDetection: true,
   invoiceNumberRequiredForVendorInvoices: true,
 };
 
@@ -60,12 +61,12 @@ export class AdminConfigService {
 
   async getPolicyConfig(): Promise<AdminPolicyConfig> {
     const value = await this.getSetting("policyConfig", DEFAULT_POLICY_CONFIG);
-    return adminPolicyConfigSchema.parse(value);
+    return adminPolicyConfigSchema.parse({ ...DEFAULT_POLICY_CONFIG, ...value });
   }
 
   async getRoutingConfig(): Promise<AdminRoutingConfig> {
     const value = await this.getSetting("routingConfig", DEFAULT_ROUTING_CONFIG);
-    return adminRoutingConfigSchema.parse(value);
+    return adminRoutingConfigSchema.parse({ ...DEFAULT_ROUTING_CONFIG, ...value });
   }
 
   async updatePolicyConfig(partial: AdminPolicyConfigUpdate): Promise<AdminPolicyConfig> {
@@ -84,7 +85,7 @@ export class AdminConfigService {
 
   async getDelegationConfig(): Promise<AdminDelegationConfig> {
     const value = await this.getSetting("delegationConfig", DEFAULT_DELEGATION_CONFIG);
-    return adminDelegationConfigSchema.parse(value);
+    return adminDelegationConfigSchema.parse({ ...DEFAULT_DELEGATION_CONFIG, ...value });
   }
 
   async updateDelegationConfig(partial: AdminDelegationConfigUpdate): Promise<AdminDelegationConfig> {
@@ -96,7 +97,7 @@ export class AdminConfigService {
 
   async getApprovalMatrixConfig(): Promise<AdminApprovalMatrixConfig> {
     const value = await this.getSetting("approvalMatrixConfig", DEFAULT_APPROVAL_MATRIX_CONFIG);
-    return adminApprovalMatrixConfigSchema.parse(value);
+    return adminApprovalMatrixConfigSchema.parse({ ...DEFAULT_APPROVAL_MATRIX_CONFIG, ...value });
   }
 
   async updateApprovalMatrixConfig(partial: AdminApprovalMatrixConfigUpdate): Promise<AdminApprovalMatrixConfig> {

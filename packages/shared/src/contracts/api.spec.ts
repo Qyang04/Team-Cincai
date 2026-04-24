@@ -57,6 +57,9 @@ test("caseDetailResponseSchema accepts the current additive case-detail surface"
         amount: "ocr.receipt.total",
         merchant: "ocr.receipt.merchant",
       },
+      modelMetadata: {
+        provider: "mock-ai",
+      },
       createdAt: "2026-04-22T09:01:00.000Z",
     },
     latestPolicyResult: {
@@ -67,6 +70,8 @@ test("caseDetailResponseSchema accepts the current additive case-detail surface"
       blockingIssues: ["Project code is required before approval."],
       requiresFinanceReview: true,
       duplicateSignals: [],
+      reconciliationFlags: ["MISSING_PROJECT_CODE"],
+      approvalRequirement: "FINANCE_REVIEW",
       createdAt: "2026-04-22T09:02:00.000Z",
     },
     latestApprovalTask: {
@@ -92,9 +97,15 @@ test("caseDetailResponseSchema accepts the current additive case-detail surface"
         id: "artifact-1",
         caseId: "case-1",
         type: "RECEIPT",
+        source: "UPLOAD",
         filename: "receipt.jpg",
         storageUri: "mock://artifacts/case-1/receipt.jpg",
         extractedText: "Lunch with client",
+        checksum: "sha256-demo",
+        metadata: {
+          extractionMethod: "OCR_IMAGE",
+          extractionWarnings: [],
+        },
         processingStatus: "PROCESSED",
         errorMessage: null,
         uploadedAt: "2026-04-22T09:00:30.000Z",
@@ -212,9 +223,15 @@ test("caseListResponseSchema accepts additive case-list rows with artifact metad
           id: "artifact-1",
           caseId: "case-1",
           type: "RECEIPT",
+          source: "UPLOAD",
           filename: "receipt.jpg",
           storageUri: "mock://artifacts/case-1/receipt.jpg",
           extractedText: "Lunch with client",
+          checksum: "sha256-demo",
+          metadata: {
+            extractionMethod: "OCR_IMAGE",
+            extractionWarnings: [],
+          },
           processingStatus: "PROCESSED",
           errorMessage: null,
           uploadedAt: "2026-04-22T09:00:30.000Z",
@@ -302,6 +319,9 @@ test("caseSubmissionResponseSchema accepts the current submit-draft response", (
           amount: "ocr.receipt.total",
         },
         openQuestions: ["Please add the project code for this meal."],
+        modelMetadata: {
+          provider: "mock-ai",
+        },
       },
       decision: {
         recommendedAction: "ask_requester_for_project_code",
@@ -321,6 +341,7 @@ test("admin config schemas accept the current policy, routing, and connector pay
     managerApprovalThreshold: 500,
     requireProjectCodeWorkflows: ["EXPENSE_CLAIM", "INTERNAL_PAYMENT_REQUEST"],
     duplicateFilenameDetection: true,
+    duplicateEvidenceDetection: true,
     invoiceNumberRequiredForVendorInvoices: true,
   });
   const routing = adminRoutingConfigSchema.parse({
@@ -346,6 +367,7 @@ test("adminPolicyConfigSchema normalizes legacy lowercase workflow identifiers",
     managerApprovalThreshold: 500,
     requireProjectCodeWorkflows: ["expense_claim", "internal_payment_request"],
     duplicateFilenameDetection: true,
+    duplicateEvidenceDetection: true,
     invoiceNumberRequiredForVendorInvoices: true,
   });
 

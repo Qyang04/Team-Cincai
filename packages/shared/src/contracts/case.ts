@@ -63,10 +63,13 @@ export const caseArtifactSchema = z.object({
   id: z.string().min(1),
   caseId: z.string().min(1),
   type: artifactTypeSchema,
+  source: nullableStringSchema.optional(),
   filename: z.string().min(1),
   mimeType: nullableStringSchema.optional(),
   storageUri: nullableStringSchema.optional(),
   extractedText: nullableStringSchema.optional(),
+  checksum: nullableStringSchema.optional(),
+  metadata: recordOfUnknownSchema.nullable().optional(),
   processingStatus: z.string().min(1),
   errorMessage: nullableStringSchema.optional(),
   uploadedAt: nullableIsoDateTimeStringSchema.optional(),
@@ -97,6 +100,7 @@ export const caseExtractionResultSchema = z.object({
   fieldsJson: z.record(z.string(), caseFieldValueSchema),
   confidence: z.number(),
   provenance: recordOfStringsSchema.nullable().optional(),
+  modelMetadata: recordOfUnknownSchema.nullable().optional(),
   createdAt: isoDateTimeStringSchema,
 });
 export type CaseExtractionResult = z.infer<typeof caseExtractionResultSchema>;
@@ -441,6 +445,7 @@ export const aiExtractionViewSchema = z.object({
   confidence: z.number(),
   provenance: recordOfStringsSchema,
   openQuestions: stringArraySchema,
+  modelMetadata: recordOfUnknownSchema.optional(),
 });
 export type AiExtractionView = z.infer<typeof aiExtractionViewSchema>;
 

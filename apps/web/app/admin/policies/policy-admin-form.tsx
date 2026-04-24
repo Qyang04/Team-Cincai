@@ -131,6 +131,7 @@ export function PolicyAdminForm({
             .filter(Boolean)
             .map((item) => normalizeWorkflowTypeIdentifier(item)),
           duplicateFilenameDetection: formData.get("duplicateFilenameDetection") === "on",
+          duplicateEvidenceDetection: formData.get("duplicateEvidenceDetection") === "on",
           invoiceNumberRequiredForVendorInvoices:
             formData.get("invoiceNumberRequiredForVendorInvoices") === "on",
         });
@@ -266,6 +267,17 @@ export function PolicyAdminForm({
             <div>
               <strong>Duplicate filename detection</strong>
               <p className="muted">Raise a signal when uploaded evidence matches earlier submissions.</p>
+            </div>
+          </label>
+          <label className="toggle-field">
+            <input
+              name="duplicateEvidenceDetection"
+              type="checkbox"
+              defaultChecked={initialPolicy.duplicateEvidenceDetection}
+            />
+            <div>
+              <strong>Evidence-based duplicate detection</strong>
+              <p className="muted">Compare extracted values and artifact fingerprints across cases before approval.</p>
             </div>
           </label>
           <label className="toggle-field">
