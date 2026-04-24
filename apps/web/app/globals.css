@@ -468,7 +468,7 @@ textarea {
   display: flex;
   justify-content: space-between;
   gap: 18px;
-  align-items: end;
+  align-items: flex-end;
 }
 
 .workspace-header h1,
@@ -680,7 +680,7 @@ textarea {
   display: flex;
   justify-content: space-between;
   gap: 14px;
-  align-items: start;
+  align-items: flex-start;
   margin-bottom: 18px;
 }
 
@@ -857,7 +857,7 @@ textarea {
 
 .data-row-stacked {
   grid-template-columns: 1fr;
-  align-items: start;
+  align-items: flex-start;
 }
 
 .queue-item {
@@ -914,7 +914,7 @@ textarea {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  align-items: start;
+  align-items: flex-start;
 }
 
 .login-role-head strong {
@@ -1101,7 +1101,7 @@ code {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 14px;
-  align-items: end;
+  align-items: flex-end;
 }
 
 .chart-bar {
@@ -1362,7 +1362,7 @@ code {
   display: grid;
   gap: 12px;
   grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start;
+  align-items: flex-start;
 }
 
 .decision-strip {
@@ -1436,7 +1436,7 @@ code {
 .toggle-field {
   display: flex;
   gap: 12px;
-  align-items: start;
+  align-items: flex-start;
   padding: 14px 16px;
   border: 1px solid var(--line);
   border-radius: 18px;
@@ -1674,7 +1674,7 @@ td {
   .approval-topline,
   .case-hero-top {
     flex-direction: column;
-    align-items: start;
+    align-items: flex-start;
   }
 
   .topbar-search,

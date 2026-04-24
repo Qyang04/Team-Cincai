@@ -1,4 +1,10 @@
-import { DEFAULT_API_BASE_URL, financeReviewQueueResponseSchema, type FinanceReviewQueueItem } from "@finance-ops/shared";
+import {
+  DEFAULT_API_BASE_URL,
+  financeReviewAnalyticsSummarySchema,
+  financeReviewQueueResponseSchema,
+  type FinanceReviewAnalyticsSummary,
+  type FinanceReviewQueueItem,
+} from "@finance-ops/shared";
 import Link from "next/link";
 import { getServerAuthHeaders } from "../lib/session";
 import { fetchApiJson } from "../lib/server-api";
@@ -25,6 +31,21 @@ async function getFinanceReviewCases(): Promise<{ reviews: FinanceReviewQueueIte
   };
 }
 
+async function getFinanceReviewAnalytics(): Promise<FinanceReviewAnalyticsSummary | null> {
+  const headers = await getServerAuthHeaders();
+  const result = await fetchApiJson<FinanceReviewAnalyticsSummary | null>({
+    url: `${apiBaseUrl}/cases/finance-review/analytics`,
+    init: {
+      cache: "no-store",
+      headers,
+    },
+    fallbackData: null,
+    resourceLabel: "Finance review analytics",
+    parse: (value) => financeReviewAnalyticsSummarySchema.parse(value),
+  });
+  return result.ok ? result.data : null;
+}
+
 function humanizeWorkflow(workflowType: string): string {
   return workflowType
     .replace(/_/g, " ")
@@ -34,6 +55,7 @@ function humanizeWorkflow(workflowType: string): string {
 
 export default async function FinanceReviewPage() {
   const { reviews, errorMessage } = await getFinanceReviewCases();
+  const analytics = await getFinanceReviewAnalytics();
 
   return (
     <div className="workspace workspace-tight fade-up">
@@ -59,8 +81,47 @@ export default async function FinanceReviewPage() {
           <span className="inline-status">
             {reviews.length} open review{reviews.length === 1 ? "" : "s"}
           </span>
+          {analytics ? (
+            <>
+              <span className="inline-status">
+                Throughput {analytics.approvedLast7d} approved / {analytics.rejectedLast7d} rejected (7d)
+              </span>
+              <span className="inline-status">Sent-back follow-up {analytics.sentBackOpenReviews}</span>
+              <span className="inline-status">Unassigned open {analytics.unassignedOpenReviews}</span>
+              <span className="inline-status">
+                Avg resolution {analytics.avgResolutionHours !== null ? `${analytics.avgResolutionHours.toFixed(1)}h` : "N/A"}
+              </span>
+            </>
+          ) : null}
         </div>
       </section>
+
+      {analytics ? (
+        <section className="metric-strip">
+          <article className="metric-tile">
+            <p className="metric-label">Open finance reviews</p>
+            <h2>{analytics.openReviews}</h2>
+            <p className="muted">Includes active and sent-back follow-up</p>
+          </article>
+          <article className="metric-tile">
+            <p className="metric-label">Sent-back follow-up</p>
+            <h2>{analytics.sentBackOpenReviews}</h2>
+            <p className="muted">Requester clarification loops still visible</p>
+          </article>
+          <article className="metric-tile metric-attention">
+            <p className="metric-label">Unassigned open</p>
+            <h2>{analytics.unassignedOpenReviews}</h2>
+            <p className="muted">Reviews missing owner or reviewer</p>
+          </article>
+          <article className="metric-tile metric-critical">
+            <p className="metric-label">7d throughput</p>
+            <h2>{analytics.approvedLast7d + analytics.rejectedLast7d}</h2>
+            <p className="muted">
+              {analytics.approvedLast7d} approved / {analytics.rejectedLast7d} rejected
+            </p>
+          </article>
+        </section>
+      ) : null}
 
       <section className="queue-grid">
         {reviews.length ? (

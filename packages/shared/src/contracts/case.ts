@@ -328,6 +328,16 @@ export const approvalSlaSweepResponseSchema = z.object({
 });
 export type ApprovalSlaSweepResponse = z.infer<typeof approvalSlaSweepResponseSchema>;
 
+export const financeReviewAnalyticsSummarySchema = z.object({
+  openReviews: z.number().int().nonnegative(),
+  sentBackOpenReviews: z.number().int().nonnegative(),
+  approvedLast7d: z.number().int().nonnegative(),
+  rejectedLast7d: z.number().int().nonnegative(),
+  unassignedOpenReviews: z.number().int().nonnegative(),
+  avgResolutionHours: z.number().nullable(),
+});
+export type FinanceReviewAnalyticsSummary = z.infer<typeof financeReviewAnalyticsSummarySchema>;
+
 export const financeReviewQueueItemSchema = caseFinanceReviewItemSchema.extend({
   case: caseSummarySchema.pick({
     id: true,

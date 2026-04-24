@@ -17,6 +17,7 @@ import { FileInterceptor } from "@nestjs/platform-express";
 import {
   approvalAnalyticsSummarySchema,
   approvalSlaSweepResponseSchema,
+  financeReviewAnalyticsSummarySchema,
   createCaseSchema,
   submitCaseSchema,
   type ApprovalActionResponse,
@@ -25,6 +26,7 @@ import {
   type CaseStatus,
   type ExportActionResponse,
   type FinanceReviewActionResponse,
+  type FinanceReviewAnalyticsSummary,
   type QuestionResponseActionResponse,
   type RecoverActionResponse,
   type WorkflowType,
@@ -736,6 +738,12 @@ export class CasesController {
   @Roles("FINANCE_REVIEWER", "ADMIN")
   listFinanceReviewCases(@CurrentUser() user: AuthenticatedUser) {
     return this.financeReviewService.listOpenCases(user.id, user.roles.includes("ADMIN"));
+  }
+
+  @Get("/finance-review/analytics")
+  @Roles("FINANCE_REVIEWER", "ADMIN")
+  async getFinanceReviewAnalytics(): Promise<FinanceReviewAnalyticsSummary> {
+    return financeReviewAnalyticsSummarySchema.parse(await this.financeReviewService.getFinanceReviewAnalytics());
   }
 
   @Post("/finance-review/:reviewId/approve")

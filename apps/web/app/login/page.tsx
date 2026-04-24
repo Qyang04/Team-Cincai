@@ -98,6 +98,12 @@ export default function LoginPage() {
         }
         const payload = authTokenResponseSchema.parse(await response.json());
         setClientAccessToken(payload.accessToken);
+        console.log("[auth] demo-login success", {
+          userId: payload.user.id,
+          displayName: payload.user.displayName,
+          roles: payload.user.roles,
+          source: payload.user.source,
+        });
         router.push(redirectTo);
         router.refresh();
       } catch (caughtError) {

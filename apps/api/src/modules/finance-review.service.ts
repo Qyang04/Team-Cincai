@@ -28,10 +28,16 @@ export class FinanceReviewService {
   }
 
   async listOpenCases(userId?: string, includeAll = false): Promise<FinanceReviewQueueItem[]> {
+    const openReviewFilter = {
+      OR: [{ outcome: null }, { outcome: "SENT_BACK" }],
+    };
+
     const reviews = await this.prisma.financeReview.findMany({
       where: includeAll || !userId
-        ? { outcome: null }
-        : { outcome: null, OR: [{ reviewerId: userId }, { ownerId: userId }] },
+        ? openReviewFilter
+        : {
+            AND: [openReviewFilter, { OR: [{ reviewerId: userId }, { ownerId: userId }] }],
+          },
       orderBy: { createdAt: "asc" },
       include: { case: true },
     });
@@ -122,5 +128,51 @@ export class FinanceReviewService {
       where: { caseId, outcome: null },
       orderBy: { createdAt: "desc" },
     });
+  }
+
+  async getFinanceReviewAnalytics() {
+    const openWhere = {
+      OR: [{ outcome: null }, { outcome: "SENT_BACK" }],
+    };
+    const now = Date.now();
+    const last7d = new Date(now - 7 * 24 * 60 * 60 * 1000);
+
+    const [openReviews, sentBackOpenReviews, approvedLast7d, rejectedLast7d, unassignedOpenReviews, resolvedLast7d] =
+      await Promise.all([
+        this.prisma.financeReview.count({ where: openWhere }),
+        this.prisma.financeReview.count({ where: { outcome: "SENT_BACK" } }),
+        this.prisma.financeReview.count({ where: { outcome: "APPROVED", updatedAt: { gte: last7d } } }),
+        this.prisma.financeReview.count({ where: { outcome: "REJECTED", updatedAt: { gte: last7d } } }),
+        this.prisma.financeReview.count({
+          where: {
+            AND: [openWhere, { OR: [{ ownerId: null }, { reviewerId: null }] }],
+          },
+        }),
+        this.prisma.financeReview.findMany({
+          where: {
+            outcome: { in: ["APPROVED", "REJECTED"] },
+            updatedAt: { gte: last7d },
+          },
+          select: {
+            createdAt: true,
+            updatedAt: true,
+          },
+        }),
+      ]);
+
+    const avgResolutionHours = resolvedLast7d.length
+      ? resolvedLast7d.reduce((total, review) => total + (review.updatedAt.getTime() - review.createdAt.getTime()), 0) /
+        resolvedLast7d.length /
+        (1000 * 60 * 60)
+      : null;
+
+    return {
+      openReviews,
+      sentBackOpenReviews,
+      approvedLast7d,
+      rejectedLast7d,
+      unassignedOpenReviews,
+      avgResolutionHours,
+    };
   }
 }

@@ -11,6 +11,7 @@ import Link from "next/link";
 import { getServerAuthHeaders } from "../lib/session";
 import { fetchApiJson } from "../lib/server-api";
 import { ApprovalActionForm } from "./approval-action-form";
+import { ApprovalsToastHost } from "./approvals-toast";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
 
@@ -64,6 +65,51 @@ type CaseGraph = {
   }>;
 };
 
+function resolveStageStatus(input: {
+  dependencyType: string;
+  requiredApprovals: number;
+  total: number;
+  approved: number;
+  rejected: number;
+  inProgress: number;
+  blocked: number;
+}): string {
+  const dependencyType = input.dependencyType;
+
+  if (input.total > 0 && input.blocked === input.total) {
+    return "BLOCKED";
+  }
+
+  if (dependencyType === "ANY_ONE") {
+    if (input.approved >= 1) {
+      return "APPROVED";
+    }
+    if (input.inProgress === 0) {
+      return "REJECTED";
+    }
+    return "ACTIVE";
+  }
+
+  if (dependencyType === "MIN_N") {
+    const threshold = Math.max(1, Math.min(input.requiredApprovals, input.total));
+    if (input.approved >= threshold) {
+      return "APPROVED";
+    }
+    if (input.approved + input.inProgress < threshold) {
+      return "REJECTED";
+    }
+    return "ACTIVE";
+  }
+
+  if (input.rejected > 0) {
+    return "REJECTED";
+  }
+  if (input.total > 0 && input.approved === input.total) {
+    return "APPROVED";
+  }
+  return "ACTIVE";
+}
+
 function buildCaseGraph(caseId: string, tasks: CaseApprovalTask[]): CaseGraph {
   const grouped = new Map<number, CaseApprovalTask[]>();
   for (const task of tasks) {
@@ -81,15 +127,25 @@ function buildCaseGraph(caseId: string, tasks: CaseApprovalTask[]): CaseGraph {
     const approved = stageTasks.filter((task) => task.status === "APPROVED").length;
     const rejected = stageTasks.filter((task) => task.status === "REJECTED").length;
     const blocked = stageTasks.filter((task) => task.status === "BLOCKED").length;
+    const inProgress = stageTasks.filter((task) => task.status === "PENDING" || task.status === "INFO_REQUESTED").length;
     const total = stageTasks.length;
-    const status =
-      rejected > 0 ? "REJECTED" : approved === total && total > 0 ? "APPROVED" : blocked === total ? "BLOCKED" : "ACTIVE";
+    const dependencyType = stageTasks[0]?.stageDependencyType ?? "ALL_REQUIRED";
+    const requiredApprovals = stageTasks[0]?.stageRequiredApprovals ?? total;
+    const status = resolveStageStatus({
+      dependencyType,
+      requiredApprovals,
+      total,
+      approved,
+      rejected,
+      inProgress,
+      blocked,
+    });
     return {
       stageNumber,
       label: stageTasks[0]?.stageLabel ?? "Approval stage",
       status,
-      dependencyType: stageTasks[0]?.stageDependencyType ?? "ALL_REQUIRED",
-      requiredApprovals: stageTasks[0]?.stageRequiredApprovals ?? total,
+      dependencyType,
+      requiredApprovals,
       total,
       approved,
       blocker: null as string | null,
@@ -188,6 +244,7 @@ export default async function ApprovalsPage() {
 
   return (
     <div className="workspace workspace-tight fade-up">
+      <ApprovalsToastHost />
       {errorMessage ? (
         <div className="notice">
           <strong>Approval queue failed to load.</strong>

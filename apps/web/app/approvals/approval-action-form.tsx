@@ -4,34 +4,31 @@ import { DEFAULT_API_BASE_URL, approvalActionResponseSchema } from "@finance-ops
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { getApiBaseUrl, getClientAuthHeaders } from "../lib/client-session";
+import { publishApprovalToast } from "./approvals-toast";
 
 const apiBaseUrl = getApiBaseUrl() ?? DEFAULT_API_BASE_URL;
 
 type Mode = "approve" | "reject" | "request-info" | "delegate";
 
-type Feedback = { kind: "success"; message: string } | { kind: "error"; message: string } | null;
-
 export function ApprovalActionForm({ taskId }: { taskId: string }) {
-  const [feedback, setFeedback] = useState<Feedback>(null);
   const [pendingMode, setPendingMode] = useState<Mode | null>(null);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
   function submit(mode: Mode, formData: FormData) {
-    setFeedback(null);
     setPendingMode(mode);
 
     const detail = String(formData.get("detail") ?? "").trim();
     const delegateTo = String(formData.get("delegateTo") ?? "").trim();
 
     if (mode === "request-info" && !detail) {
-      setFeedback({ kind: "error", message: "Please describe what information is needed from the requester." });
+      publishApprovalToast({ kind: "error", message: "Please describe what information is needed from the requester." });
       setPendingMode(null);
       return;
     }
 
     if (mode === "delegate" && !delegateTo) {
-      setFeedback({ kind: "error", message: "Please provide a delegate approver ID." });
+      publishApprovalToast({ kind: "error", message: "Please provide a delegate approver ID." });
       setPendingMode(null);
       return;
     }
@@ -71,10 +68,13 @@ export function ApprovalActionForm({ taskId }: { taskId: string }) {
             ? `Delegated to ${delegateTo}.`
             : "Information requested. Requester has been notified in-app.";
 
-        setFeedback({ kind: "success", message: successMessage });
-        router.refresh();
+        publishApprovalToast({ kind: "success", message: successMessage });
+        // Give operators a moment to see the confirmation before refreshing queue data.
+        setTimeout(() => {
+          router.refresh();
+        }, 900);
       } catch (error) {
-        setFeedback({
+        publishApprovalToast({
           kind: "error",
           message: error instanceof Error ? error.message : "Unexpected approval error.",
         });
@@ -149,10 +149,6 @@ export function ApprovalActionForm({ taskId }: { taskId: string }) {
           {isPending && pendingMode === "delegate" ? "Delegating..." : "Delegate"}
         </button>
       </div>
-
-      {feedback ? (
-        <p className={feedback.kind === "error" ? "text-danger" : "muted"}>{feedback.message}</p>
-      ) : null}
     </form>
   );
 }

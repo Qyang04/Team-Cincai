@@ -2,8 +2,6 @@ import js from "@eslint/js";
 import { FlatCompat } from "@eslint/eslintrc";
 import { defineConfig, globalIgnores } from "eslint/config";
 import globals from "globals";
-import nextTs from "eslint-config-next/typescript.js";
-import nextVitals from "eslint-config-next/core-web-vitals.js";
 import tseslint from "typescript-eslint";
 import { dirname } from "path";
 import { fileURLToPath } from "url";
@@ -41,11 +39,11 @@ export default defineConfig([
       "no-undef": "off",
     },
   },
-  ...compat.config(nextVitals).map((config) => ({
+  ...compat.extends("next/core-web-vitals").map((config) => ({
     ...config,
     files: ["apps/web/**/*.{js,jsx,ts,tsx}"],
   })),
-  ...compat.config(nextTs).map((config) => ({
+  ...compat.extends("next/typescript").map((config) => ({
     ...config,
     files: ["apps/web/**/*.{js,jsx,ts,tsx}"],
   })),

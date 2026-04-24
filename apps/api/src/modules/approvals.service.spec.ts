@@ -257,3 +257,84 @@ test("ApprovalsService sends reminders for overdue stages without escalation", a
   assert.deepEqual(notifications, ["APPROVAL_SLA_REMINDER"]);
   assert.equal(reminderStateSaved, true);
 });
+
+test("ApprovalsService notifies next-stage approvers when blocked tasks are activated", async () => {
+  const notifications: Array<{ type: string; recipientId: string; caseId?: string; subject: string }> = [];
+
+  const prisma = {
+    approvalTask: {
+      findMany: async ({
+        where,
+      }: {
+        where: { caseId: string; stageNumber: number; status: string };
+      }) => {
+        if (where.status === "BLOCKED") {
+          return [
+            { id: "task-s2-a", stageNumber: 2, createdAt: new Date("2026-04-22T08:00:00.000Z"), caseId: "case-9" },
+            { id: "task-s2-b", stageNumber: 2, createdAt: new Date("2026-04-22T08:01:00.000Z"), caseId: "case-9" },
+          ];
+        }
+        return [{ approverId: "director.approver" }, { approverId: "finance.backup" }];
+      },
+      updateMany: async () => ({ count: 2 }),
+    },
+    approvalStage: {
+      updateMany: async () => ({ count: 1 }),
+    },
+  };
+
+  const service = new ApprovalsService(
+    prisma as never,
+    { getDelegationConfig: async () => ({ rules: [] }) } as never,
+    {
+      send: async (input: { type: string; recipientId: string; caseId?: string; subject: string }) => {
+        notifications.push(input);
+        return { delivered: true };
+      },
+    } as never,
+    { getUserById: async () => null } as never,
+  );
+
+  const result = await service.activateNextStage("case-9", 1);
+  assert.deepEqual(result, { activated: true, nextStage: 2 });
+  assert.deepEqual(
+    notifications.map((entry) => entry.recipientId).sort(),
+    ["director.approver", "finance.backup"].sort(),
+  );
+  assert.ok(notifications.every((entry) => entry.type === "approval-required"));
+});
+
+test("ApprovalsService notifies delegated approver after manual delegation", async () => {
+  const notifications: Array<{ type: string; recipientId: string; caseId?: string; subject: string }> = [];
+
+  const prisma = {
+    approvalTask: {
+      update: async () => ({ id: "task-7", caseId: "case-7", approverId: "delegate.approver" }),
+    },
+  };
+
+  const service = new ApprovalsService(
+    prisma as never,
+    { getDelegationConfig: async () => ({ rules: [] }) } as never,
+    {
+      send: async (input: { type: string; recipientId: string; caseId?: string; subject: string }) => {
+        notifications.push(input);
+        return { delivered: true };
+      },
+    } as never,
+    { getUserById: async () => null } as never,
+  );
+
+  await service.delegateTask({
+    taskId: "task-7",
+    fromApproverId: "manager.approver",
+    toApproverId: "delegate.approver",
+    reason: "Out of office",
+  });
+
+  assert.equal(notifications.length, 1);
+  assert.equal(notifications[0]?.type, "approval-required");
+  assert.equal(notifications[0]?.recipientId, "delegate.approver");
+  assert.equal(notifications[0]?.subject, "Approval task delegated to you");
+  assert.equal(notifications[0]?.caseId, "case-7");
+});

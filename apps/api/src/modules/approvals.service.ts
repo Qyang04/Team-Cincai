@@ -38,6 +38,7 @@ export class ApprovalsService implements OnModuleInit, OnModuleDestroy {
   private readonly reminderCooldownByStage = new Map<string, number>();
   private readonly sweepIntervalMs = Number(process.env.APPROVAL_SLA_SWEEP_MS ?? "60000");
   private readonly reminderStateSettingKey = "approvalSlaReminderState";
+  private readonly activeTaskStatuses = ["PENDING", "INFO_REQUESTED"] as const;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -315,6 +316,16 @@ export class ApprovalsService implements OnModuleInit, OnModuleDestroy {
       data: { status: "ACTIVE" },
     });
     await this.applyAutoDelegation(caseId, nextStage);
+    const activatedTasks = await this.prisma.approvalTask.findMany({
+      where: { caseId, stageNumber: nextStage, status: "PENDING" },
+      select: { approverId: true },
+    });
+    await this.notifyApprovalRequired(
+      caseId,
+      [...new Set(activatedTasks.map((task) => task.approverId))],
+      "Approval required",
+      `Case ${caseId} moved to stage ${nextStage}. Your approval is now required.`,
+    );
     return { activated: true, nextStage };
   }
 
@@ -398,7 +409,7 @@ export class ApprovalsService implements OnModuleInit, OnModuleDestroy {
     toApproverId: string;
     reason?: string;
   }) {
-    return this.prisma.approvalTask.update({
+    const updatedTask = await this.prisma.approvalTask.update({
       where: { id: input.taskId },
       data: {
         approverId: input.toApproverId,
@@ -409,6 +420,26 @@ export class ApprovalsService implements OnModuleInit, OnModuleDestroy {
         actingApproverId: null,
       },
     });
+    await this.notifyApprovalRequired(
+      updatedTask.caseId,
+      [input.toApproverId],
+      "Approval task delegated to you",
+      `Case ${updatedTask.caseId} approval task ${input.taskId} was delegated to you from ${input.fromApproverId}.`,
+    );
+    return updatedTask;
+  }
+
+  private async notifyApprovalRequired(caseId: string, approverIds: string[], subject: string, body: string) {
+    const recipients = [...new Set(approverIds.filter((recipientId) => recipientId.trim().length > 0))];
+    for (const recipientId of recipients) {
+      await this.notificationsService.send({
+        type: "approval-required",
+        recipientId,
+        subject,
+        body,
+        caseId,
+      });
+    }
   }
 
   private async getDelegationConfig(): Promise<AdminDelegationConfig> {
@@ -465,6 +496,23 @@ export class ApprovalsService implements OnModuleInit, OnModuleDestroy {
           actingApproverId: null,
         },
       });
+      const delegatedTasks = await this.prisma.approvalTask.count({
+        where: {
+          caseId,
+          ...(stageNumber ? { stageNumber } : {}),
+          approverId: rule.delegateTo,
+          delegatedFrom: rule.approverId,
+          status: { in: [...this.activeTaskStatuses] },
+        },
+      });
+      if (delegatedTasks > 0) {
+        await this.notifyApprovalRequired(
+          caseId,
+          [rule.delegateTo],
+          "Approval task auto-delegated to you",
+          `Case ${caseId} has ${delegatedTasks} approval task${delegatedTasks === 1 ? "" : "s"} auto-delegated to you.`,
+        );
+      }
     }
   }
 

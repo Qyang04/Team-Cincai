@@ -581,6 +581,49 @@ type ApprovalStageView = {
   blockerStageNumber: number | null;
 };
 
+function resolveApprovalStageSummary(input: {
+  dependencyType: string;
+  requiredApprovals: number;
+  totalCount: number;
+  approvedCount: number;
+  rejectedCount: number;
+  blockedCount: number;
+  inFlightCount: number;
+}): string {
+  if (input.totalCount > 0 && input.blockedCount === input.totalCount) {
+    return "BLOCKED";
+  }
+
+  if (input.dependencyType === "ANY_ONE") {
+    if (input.approvedCount >= 1) {
+      return "APPROVED";
+    }
+    if (input.inFlightCount === 0) {
+      return "REJECTED";
+    }
+    return "ACTIVE";
+  }
+
+  if (input.dependencyType === "MIN_N") {
+    const threshold = Math.max(1, Math.min(input.requiredApprovals, input.totalCount));
+    if (input.approvedCount >= threshold) {
+      return "APPROVED";
+    }
+    if (input.approvedCount + input.inFlightCount < threshold) {
+      return "REJECTED";
+    }
+    return "ACTIVE";
+  }
+
+  if (input.rejectedCount > 0) {
+    return "REJECTED";
+  }
+  if (input.approvedCount === input.totalCount && input.totalCount > 0) {
+    return "APPROVED";
+  }
+  return "ACTIVE";
+}
+
 function buildApprovalStages(tasks: CaseApprovalTask[]): ApprovalStageView[] {
   const grouped = new Map<number, CaseApprovalTask[]>();
   for (const task of tasks) {
@@ -603,24 +646,25 @@ function buildApprovalStages(tasks: CaseApprovalTask[]): ApprovalStageView[] {
       (task) => task.status === "PENDING" || task.status === "INFO_REQUESTED",
     ).length;
     const totalCount = stageTasks.length;
+    const dependencyType = stageTasks[0]?.stageDependencyType ?? "ALL_REQUIRED";
+    const requiredApprovals = stageTasks[0]?.stageRequiredApprovals ?? totalCount;
 
-    let summaryStatus = "PENDING";
-    if (rejectedCount > 0) {
-      summaryStatus = "REJECTED";
-    } else if (approvedCount === totalCount && totalCount > 0) {
-      summaryStatus = "APPROVED";
-    } else if (blockedCount === totalCount && totalCount > 0) {
-      summaryStatus = "BLOCKED";
-    } else if (inFlightCount > 0 || approvedCount > 0) {
-      summaryStatus = "ACTIVE";
-    }
+    const summaryStatus = resolveApprovalStageSummary({
+      dependencyType,
+      requiredApprovals,
+      totalCount,
+      approvedCount,
+      rejectedCount,
+      blockedCount,
+      inFlightCount,
+    });
 
     return {
       stageNumber,
       mode: stageTasks[0]?.stageMode ?? "SEQUENTIAL",
       label: stageTasks[0]?.stageLabel ?? "Approval stage",
-      dependencyType: stageTasks[0]?.stageDependencyType ?? "ALL_REQUIRED",
-      requiredApprovals: stageTasks[0]?.stageRequiredApprovals ?? totalCount,
+      dependencyType,
+      requiredApprovals,
       slaHours: stageTasks[0]?.stageSlaHours ?? null,
       stageDueAt: stageTasks[0]?.stageDueAt ?? null,
       escalatesTo: stageTasks[0]?.stageEscalatesTo ?? null,
