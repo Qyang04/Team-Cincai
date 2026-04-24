@@ -288,6 +288,7 @@ export function CaseForm() {
                     type="button"
                     aria-label={`Remove ${file.name}`}
                     onClick={() => removeStagedFile(file)}
+                    suppressHydrationWarning
                     style={{
                       border: "none",
                       background: "transparent",
@@ -320,6 +321,7 @@ export function CaseForm() {
                     type="button"
                     aria-label={`Remove ${name}`}
                     onClick={() => removeFilename(name)}
+                    suppressHydrationWarning
                     style={{
                       border: "none",
                       background: "transparent",

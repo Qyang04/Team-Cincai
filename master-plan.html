@@ -1140,14 +1140,18 @@ stateDiagram-v2
             <ul class="status-list">
               <li>Finance queue; approve, reject, send-back; policy routing into finance.</li>
               <li>Send-back into clarification and resume.</li>
+              <li>Reason categories are structured (policy block, reconciliation, coding, risk, missing support, other).</li>
+              <li>Finance coding decisions are captured (approve-as-is, reclassify, split, hold).</li>
+              <li>Reconciliation-specific resolution fields are captured (status, reconciled amount, reconciled currency).</li>
+              <li>Finance-specific annotations are persisted and visible on the queue surface.</li>
+              <li>Queue assignment and work ownership are implemented with explicit owner assignment.</li>
             </ul>
           </div>
           <div class="status-col todo">
             <h4>Not done yet</h4>
             <ul class="status-list">
-              <li>Richer reason categories and finance coding or resolution fields.</li>
-              <li>Reconciliation-specific resolution data (settled amount, evidence notes).</li>
-              <li>Queue assignment and case ownership in the finance queue.</li>
+              <li>Optional polish: finance reviewer productivity analytics (ownership aging, category trends).</li>
+              <li>Optional polish: bulk assignment and workload balancing controls.</li>
             </ul>
           </div>
         </div>

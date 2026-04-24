@@ -161,7 +161,7 @@ Polish still possible (non-blocking):
 
 ### Finance review
 
-Status: `Functional MVP`
+Status: `MVP+ complete`
 
 Already present:
 
@@ -169,14 +169,16 @@ Already present:
 - approve, reject, send-back actions
 - finance review routing from policy
 - send-back clarification loop
+- richer reason categories (`POLICY_BLOCK`, `RECONCILIATION`, `CODING`, `RISK`, `MISSING_SUPPORT`, `OTHER`)
+- finance coding decisions (`APPROVE_AS_IS`, `RECLASSIFY`, `SPLIT`, `HOLD`)
+- reconciliation-specific resolution fields (`reconciliationStatus`, `reconciledAmount`, `reconciledCurrency`)
+- finance-specific annotations (`annotation`)
+- queue assignment and work ownership (`ownerId`) with explicit assign action
 
-Still needed:
+Polish still possible (non-blocking):
 
-- richer reason categories
-- finance coding decisions
-- reconciliation-specific resolution fields
-- finance-specific case annotations
-- queue assignment and work ownership
+- richer finance reviewer productivity analytics (for example ownership aging and category mix trends)
+- optional bulk assignment and workload balancing controls
 
 ### Export and audit
 
