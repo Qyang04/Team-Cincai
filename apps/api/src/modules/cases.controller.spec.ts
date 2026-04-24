@@ -201,6 +201,11 @@ function createCasesControllerHarness(options?: {
       }),
     } as never,
     { ensureExportReady: async () => undefined, getLatest: async () => undefined } as never,
+    {
+      canViewCase: async () => true,
+      canManageApprovalTask: async () => true,
+      canManageFinanceReview: async () => true,
+    } as never,
     { prepareUpload: async () => undefined } as never,
     { saveUploadedFile: async () => ({ storageUri: "local://case-1/mock-stored" }) } as never,
     workflowOrchestrator as never,
@@ -221,9 +226,14 @@ function createCasesControllerHarness(options?: {
 test("CasesController reopens the latest info-requested approval task before returning the case to awaiting approval", async () => {
   const harness = createCasesControllerHarness();
 
-  const answered = await harness.controller.answerQuestion("case-1", "question-1", {
-    answer: "OPS-12",
-  });
+  const answered = await harness.controller.answerQuestion(
+    "case-1",
+    "question-1",
+    { id: "demo.requester", roles: ["REQUESTER"], source: "app" } as never,
+    {
+      answer: "OPS-12",
+    },
+  );
 
   assert.equal(answered.success, true);
   assert.equal(answered.data.question.status, "ANSWERED");
@@ -247,9 +257,14 @@ test("CasesController audits and fails loudly when requester follow-up completes
   const harness = createCasesControllerHarness({ infoRequestedTask: null });
 
   await assert.rejects(
-    harness.controller.answerQuestion("case-1", "question-1", {
-      answer: "OPS-12",
-    }),
+    harness.controller.answerQuestion(
+      "case-1",
+      "question-1",
+      { id: "demo.requester", roles: ["REQUESTER"], source: "app" } as never,
+      {
+        answer: "OPS-12",
+      },
+    ),
     /Approval task awaiting requester response not found/,
   );
 
@@ -276,9 +291,14 @@ test("CasesController reruns policy routing when requester answers the final fin
     },
   });
 
-  const answered = await harness.controller.answerQuestion("case-1", "question-1", {
-    answer: "Updated supporting note",
-  });
+  const answered = await harness.controller.answerQuestion(
+    "case-1",
+    "question-1",
+    { id: "demo.requester", roles: ["REQUESTER"], source: "app" } as never,
+    {
+      answer: "Updated supporting note",
+    },
+  );
 
   assert.equal(answered.success, true);
   assert.equal(answered.data.question.status, "ANSWERED");
@@ -396,7 +416,11 @@ test("CasesController wraps export orchestration errors in the shared error enve
     },
   });
 
-  const result = await harness.controller.processExport("case-1");
+  const result = await harness.controller.processExport("case-1", {
+    id: "configured.finance",
+    roles: ["FINANCE_REVIEWER"],
+    source: "app",
+  } as never);
 
   assert.deepEqual(result, {
     success: false,

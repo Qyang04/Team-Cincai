@@ -3,8 +3,9 @@
 import { DEFAULT_API_BASE_URL, approvalActionResponseSchema } from "@finance-ops/shared";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { getApiBaseUrl, getClientAuthHeaders } from "../lib/client-session";
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
+const apiBaseUrl = getApiBaseUrl() ?? DEFAULT_API_BASE_URL;
 
 type Mode = "approve" | "reject" | "request-info" | "delegate";
 
@@ -20,7 +21,6 @@ export function ApprovalActionForm({ taskId }: { taskId: string }) {
     setFeedback(null);
     setPendingMode(mode);
 
-    const approverId = String(formData.get("approverId") ?? "manager.approver").trim() || "manager.approver";
     const detail = String(formData.get("detail") ?? "").trim();
     const delegateTo = String(formData.get("delegateTo") ?? "").trim();
 
@@ -40,17 +40,16 @@ export function ApprovalActionForm({ taskId }: { taskId: string }) {
       try {
         const body =
           mode === "request-info"
-            ? { approverId, question: detail }
+            ? { question: detail }
             : mode === "delegate"
-            ? { approverId, delegateTo, reason: detail || undefined }
-            : { approverId, decisionReason: detail || undefined };
+            ? { delegateTo, reason: detail || undefined }
+            : { decisionReason: detail || undefined };
 
         const response = await fetch(`${apiBaseUrl}/cases/approvals/${taskId}/${mode}`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-mock-role": "APPROVER",
-            "x-mock-user-id": approverId,
+            ...getClientAuthHeaders(),
           },
           body: JSON.stringify(body),
         });
@@ -91,16 +90,6 @@ export function ApprovalActionForm({ taskId }: { taskId: string }) {
       onSubmit={(event) => event.preventDefault()}
       style={{ marginTop: 12 }}
     >
-      <label className="field">
-        <span className="field-label">Acting as</span>
-        <input
-          name="approverId"
-          defaultValue="manager.approver"
-          className="field-control"
-          suppressHydrationWarning
-        />
-      </label>
-
       <label className="field">
         <span className="field-label">Rationale or question</span>
         <textarea

@@ -82,6 +82,7 @@ export class WorkflowExecutionService implements OnModuleInit {
       await this.financeReviewService.enqueue(
         payload.caseId,
         policyResult.blockingIssues.join("; ") || policyResult.warnings.join("; "),
+        routingConfig.financeReviewerId,
       );
       await this.notificationsService.send({
         type: "finance-review-required",
@@ -101,7 +102,7 @@ export class WorkflowExecutionService implements OnModuleInit {
       note: "Policy evaluation routed case to manager approval.",
     });
 
-    await this.approvalsService.createMatrixTasks({
+    const approvalTasks = await this.approvalsService.createMatrixTasks({
       caseId: payload.caseId,
       workflowType: caseRecord.workflowType,
       latestExtractionFields: caseRecord.extractionResults[0]?.fieldsJson,
@@ -109,13 +110,16 @@ export class WorkflowExecutionService implements OnModuleInit {
       routingConfig,
       managerApprovalThreshold: (await this.adminConfigService.getPolicyConfig()).managerApprovalThreshold,
     });
-    await this.notificationsService.send({
-      type: "approval-required",
-      recipientId: routingConfig.defaultApproverId,
-      subject: "Approval required",
-      body: `Case ${payload.caseId} is awaiting approval.`,
-      caseId: payload.caseId,
-    });
+    const recipients = [...new Set(approvalTasks.filter((task) => task.status === "PENDING").map((task) => task.approverId))];
+    for (const recipientId of recipients) {
+      await this.notificationsService.send({
+        type: "approval-required",
+        recipientId,
+        subject: "Approval required",
+        body: `Case ${payload.caseId} is awaiting approval.`,
+        caseId: payload.caseId,
+      });
+    }
     return { case: updated, policyResult };
   }
 

@@ -16,18 +16,22 @@ function toIsoDateTimeString(value: Date | string | null | undefined) {
 export class FinanceReviewService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async enqueue(caseId: string, note?: string) {
+  async enqueue(caseId: string, note?: string, reviewerId?: string) {
     return this.prisma.financeReview.create({
       data: {
         caseId,
         note,
+        reviewerId: reviewerId ?? null,
+        ownerId: reviewerId ?? null,
       },
     });
   }
 
-  async listOpenCases(): Promise<FinanceReviewQueueItem[]> {
+  async listOpenCases(userId?: string, includeAll = false): Promise<FinanceReviewQueueItem[]> {
     const reviews = await this.prisma.financeReview.findMany({
-      where: { outcome: null },
+      where: includeAll || !userId
+        ? { outcome: null }
+        : { outcome: null, OR: [{ reviewerId: userId }, { ownerId: userId }] },
       orderBy: { createdAt: "asc" },
       include: { case: true },
     });

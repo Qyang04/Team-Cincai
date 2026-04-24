@@ -5,8 +5,10 @@ import { AdminController } from "./admin.controller";
 import { ApprovalsService } from "./approvals.service";
 import { AiGatewayService } from "./ai-gateway.service";
 import { ArtifactExtractionService } from "./artifact-extraction.service";
+import { AuthController } from "./auth.controller";
 import { AuthGuard } from "./auth.guard";
 import { AuthService } from "./auth.service";
+import { AuthorizationService } from "./authorization.service";
 import { ArtifactsService } from "./artifacts.service";
 import { AuditService } from "./audit.service";
 import { CaseDetailService } from "./case-detail.service";
@@ -27,6 +29,8 @@ import { QueueWorkerService } from "./queue-worker.service";
 import { RolesGuard } from "./roles.guard";
 import { StorageService } from "./storage.service";
 import { TelemetryService } from "./telemetry.service";
+import { DirectorySeedService } from "./directory-seed.service";
+import { UserDirectoryService } from "./user-directory.service";
 import { WorkflowOrchestratorService } from "./workflow-orchestrator.service";
 import { WorkflowExecutionService } from "./workflow-execution.service";
 import { WorkflowService } from "./workflow.service";
@@ -35,7 +39,7 @@ import { JwtModule } from "@nestjs/jwt";
 
 @Module({
   imports: [JwtModule.register({})],
-  controllers: [HealthController, CasesController, AdminController],
+  controllers: [HealthController, CasesController, AdminController, AuthController],
   providers: [
     Reflector,
     PrismaService,
@@ -44,6 +48,7 @@ import { JwtModule } from "@nestjs/jwt";
     AiGatewayService,
     ArtifactExtractionService,
     AuthService,
+    AuthorizationService,
     ArtifactsService,
     AuditService,
     TelemetryService,
@@ -57,6 +62,8 @@ import { JwtModule } from "@nestjs/jwt";
     FinanceReviewService,
     ExportsService,
     JobRunnerService,
+    UserDirectoryService,
+    DirectorySeedService,
     WorkflowOrchestratorService,
     WorkflowExecutionService,
     QueueWorkerService,

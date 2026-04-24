@@ -4,6 +4,7 @@ import { Space_Grotesk, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import React from "react";
 import { AppShell } from "./components/app-shell";
 import { AppSidebar } from "./components/app-sidebar";
+import { getServerSession } from "./lib/session";
 
 const displayFont = Space_Grotesk({
   subsets: ["latin"],
@@ -27,13 +28,21 @@ export const metadata: Metadata = {
   description: "Agentic finance workflow platform for claims, invoices, and internal payment operations.",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const session = await getServerSession();
+
   return (
     <html lang="en">
       <body className={`${displayFont.variable} ${bodyFont.variable} ${monoFont.variable}`}>
-        <div className="app-frame">
-          <AppShell sidebar={<AppSidebar />}>{children}</AppShell>
-        </div>
+        {session ? (
+          <div className="app-frame">
+            <AppShell user={session.user} sidebar={<AppSidebar user={session.user} />}>
+              {children}
+            </AppShell>
+          </div>
+        ) : (
+          <div className="app-frame">{children}</div>
+        )}
       </body>
     </html>
   );

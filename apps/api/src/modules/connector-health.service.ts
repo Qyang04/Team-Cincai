@@ -6,7 +6,7 @@ export class ConnectorHealthService {
   getStatus(): AdminConnectorStatus[] {
     const queueMode = process.env.QUEUE_MODE ?? "inline";
     const useMockAi = (process.env.USE_MOCK_AI ?? "true").toLowerCase() !== "false";
-    const useMockAuth = (process.env.USE_MOCK_AUTH ?? "true").toLowerCase() !== "false";
+    const useMockAuth = (process.env.USE_MOCK_AUTH ?? "false").toLowerCase() === "true";
     const useMockStorage = (process.env.USE_MOCK_STORAGE ?? "true").toLowerCase() !== "false";
 
     return adminConnectorsResponseSchema.parse([
@@ -22,8 +22,10 @@ export class ConnectorHealthService {
       },
       {
         connector: "Auth",
-        status: useMockAuth ? "mock-enabled" : "supabase-jwt",
-        detail: useMockAuth ? "Mock headers drive user identity and role selection." : "Supabase JWT verification is active.",
+        status: useMockAuth ? "mock-enabled" : "app-session-jwt",
+        detail: useMockAuth
+          ? "Mock headers drive user identity and role selection."
+          : "App-issued demo JWT sessions are active, with Supabase JWT support available when configured.",
       },
       {
         connector: "Storage",

@@ -47,7 +47,7 @@ function createWorkflowExecutionHarness(options?: {
   const approvalsService = {
     createMatrixTasks: async (input: Record<string, unknown>) => {
       createdTasks.push(input);
-      return [{ id: "task-1", caseId: input.caseId, approverId: "configured.approver" }];
+      return [{ id: "task-1", caseId: input.caseId, approverId: "configured.approver", status: "PENDING" }];
     },
   };
 
@@ -131,7 +131,7 @@ function createWorkflowExecutionHarness(options?: {
   };
 }
 
-test("WorkflowExecutionService routes policy-passing cases to the configured approver", async () => {
+test("WorkflowExecutionService routes policy-passing cases to the created approval assignee", async () => {
   const harness = createWorkflowExecutionHarness();
 
   const result = await harness.service.handlePolicyRoute({ caseId: "case-1" });

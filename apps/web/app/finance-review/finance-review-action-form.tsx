@@ -3,8 +3,9 @@
 import { DEFAULT_API_BASE_URL, financeReviewActionResponseSchema } from "@finance-ops/shared";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { getApiBaseUrl, getClientAuthHeaders } from "../lib/client-session";
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
+const apiBaseUrl = getApiBaseUrl() ?? DEFAULT_API_BASE_URL;
 
 type Mode = "approve" | "reject" | "send-back" | "assign";
 
@@ -20,7 +21,6 @@ export function FinanceReviewActionForm({ reviewId }: { reviewId: string }) {
     setFeedback(null);
     setPendingMode(mode);
 
-    const reviewerId = String(formData.get("reviewerId") ?? "finance.reviewer").trim() || "finance.reviewer";
     const note = String(formData.get("note") ?? "").trim();
     const ownerId = String(formData.get("ownerId") ?? "").trim();
     const reasonCategory = String(formData.get("reasonCategory") ?? "").trim();
@@ -48,14 +48,12 @@ export function FinanceReviewActionForm({ reviewId }: { reviewId: string }) {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-mock-role": "FINANCE_REVIEWER",
-            "x-mock-user-id": reviewerId,
+            ...getClientAuthHeaders(),
           },
           body: JSON.stringify(
             mode === "assign"
               ? { ownerId }
               : {
-                  reviewerId,
                   ownerId: ownerId || undefined,
                   reasonCategory: reasonCategory || undefined,
                   codingDecision: codingDecision || undefined,
@@ -107,18 +105,8 @@ export function FinanceReviewActionForm({ reviewId }: { reviewId: string }) {
       style={{ marginTop: 12 }}
     >
       <label className="field">
-        <span className="field-label">Acting as</span>
-        <input
-          name="reviewerId"
-          defaultValue="finance.reviewer"
-          className="field-control"
-          suppressHydrationWarning
-        />
-      </label>
-
-      <label className="field">
         <span className="field-label">Owner (work assignment)</span>
-        <input name="ownerId" defaultValue="finance.reviewer" className="field-control" suppressHydrationWarning />
+        <input name="ownerId" placeholder="Assign to finance reviewer ID" className="field-control" suppressHydrationWarning />
       </label>
 
       <label className="field">

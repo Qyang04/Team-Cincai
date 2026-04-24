@@ -2,8 +2,9 @@
 
 import { DEFAULT_API_BASE_URL, type CaseArtifact } from "@finance-ops/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { getApiBaseUrl, getClientAuthHeaders } from "../../lib/client-session";
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
+const apiBaseUrl = getApiBaseUrl() ?? DEFAULT_API_BASE_URL;
 
 type PreviewKind = "image" | "pdf" | "text" | "download";
 
@@ -49,11 +50,6 @@ type FetchState =
   | { kind: "ready"; url: string; previewKind: PreviewKind }
   | { kind: "error"; message: string };
 
-const defaultMockHeaders = {
-  "x-mock-role": "ALL" as const,
-  "x-mock-user-id": "artifact.preview",
-};
-
 export function ArtifactPreviewDialog({ caseId, artifact }: { caseId: string; artifact: CaseArtifact }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [fetchState, setFetchState] = useState<FetchState>({ kind: "idle" });
@@ -76,9 +72,7 @@ export function ArtifactPreviewDialog({ caseId, artifact }: { caseId: string; ar
     setFetchState({ kind: "loading" });
     try {
       const res = await fetch(fileUrl, {
-        headers: {
-          ...defaultMockHeaders,
-        },
+        headers: getClientAuthHeaders(),
       });
       if (!res.ok) {
         const message = await readErrorBody(res);

@@ -11,14 +11,11 @@ import {
   type AdminPolicyConfig,
   type AdminRoutingConfig,
 } from "@finance-ops/shared";
+import { getServerAuthHeaders } from "../../lib/session";
 import { fetchApiJson } from "../../lib/server-api";
 import { PolicyAdminForm } from "./policy-admin-form";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
-const adminHeaders = {
-  "x-mock-role": "ADMIN",
-  "x-mock-user-id": "admin.user",
-};
 
 const fallbackPolicy: AdminPolicyConfig = {
   managerApprovalThreshold: 500,
@@ -52,6 +49,7 @@ async function getAdminData(): Promise<{
   };
   errors: string[];
 }> {
+  const adminHeaders = await getServerAuthHeaders();
   const [policyResult, routingResult, connectorsResult, delegationResult, approvalMatrixResult] = await Promise.all([
     fetchApiJson<AdminPolicyConfig>({
       url: `${apiBaseUrl}/admin/policies`,

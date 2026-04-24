@@ -3,8 +3,9 @@
 import { DEFAULT_API_BASE_URL, exportActionResponseSchema } from "@finance-ops/shared";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { getApiBaseUrl, getClientAuthHeaders } from "../../lib/client-session";
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
+const apiBaseUrl = getApiBaseUrl() ?? DEFAULT_API_BASE_URL;
 
 type Feedback = { kind: "success"; message: string } | { kind: "error"; message: string } | null;
 
@@ -21,7 +22,7 @@ export function ExportActionForm({ caseId }: { caseId: string }) {
         const response = await fetch(`${apiBaseUrl}/cases/${caseId}/export`, {
           method: "POST",
           headers: {
-            "x-mock-role": "FINANCE_REVIEWER",
+            ...getClientAuthHeaders(),
           },
         });
 

@@ -6,6 +6,7 @@ import {
   type CaseTimelineItem,
 } from "@finance-ops/shared";
 import Link from "next/link";
+import { getServerAuthHeaders } from "../../lib/session";
 import { fetchApiJson } from "../../lib/server-api";
 import { ArtifactPreviewDialog } from "./artifact-preview-dialog";
 import { ExportActionForm } from "./export-action-form";
@@ -82,10 +83,12 @@ function statusChipClass(status: string): string {
 async function getCaseDetail(
   id: string,
 ): Promise<{ caseDetail: CaseDetailResponse | null; errorMessage: string | null; isMissing: boolean }> {
+  const headers = await getServerAuthHeaders();
   const result = await fetchApiJson<CaseDetailResponse | null>({
     url: `${apiBaseUrl}/cases/${id}`,
     init: {
       cache: "no-store",
+      headers,
     },
     fallbackData: null,
     resourceLabel: `Case ${id}`,

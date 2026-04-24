@@ -8,20 +8,19 @@ import {
   type CaseApprovalTask,
 } from "@finance-ops/shared";
 import Link from "next/link";
+import { getServerAuthHeaders } from "../lib/session";
 import { fetchApiJson } from "../lib/server-api";
 import { ApprovalActionForm } from "./approval-action-form";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
 
 async function getApprovalTasks(): Promise<{ tasks: ApprovalQueueItem[]; errorMessage: string | null }> {
+  const headers = await getServerAuthHeaders();
   const result = await fetchApiJson<ApprovalQueueItem[]>({
     url: `${apiBaseUrl}/cases/approvals/tasks`,
     init: {
       cache: "no-store",
-      headers: {
-        "x-mock-role": "APPROVER",
-        "x-mock-user-id": "manager.approver",
-      },
+      headers,
     },
     fallbackData: [],
     resourceLabel: "Approval queue",
@@ -35,14 +34,12 @@ async function getApprovalTasks(): Promise<{ tasks: ApprovalQueueItem[]; errorMe
 }
 
 async function getApprovalAnalytics(): Promise<ApprovalAnalyticsSummary | null> {
+  const headers = await getServerAuthHeaders();
   const result = await fetchApiJson<ApprovalAnalyticsSummary | null>({
     url: `${apiBaseUrl}/cases/approvals/analytics`,
     init: {
       cache: "no-store",
-      headers: {
-        "x-mock-role": "APPROVER",
-        "x-mock-user-id": "manager.approver",
-      },
+      headers,
     },
     fallbackData: null,
     resourceLabel: "Approval analytics",
@@ -126,16 +123,14 @@ async function getCaseGraphs(caseIds: string[]): Promise<Record<string, CaseGrap
   if (!caseIds.length) {
     return {};
   }
+  const headers = await getServerAuthHeaders();
   const entries = await Promise.all(
     caseIds.map(async (caseId) => {
       const result = await fetchApiJson({
         url: `${apiBaseUrl}/cases/${caseId}`,
         init: {
           cache: "no-store",
-          headers: {
-            "x-mock-role": "APPROVER",
-            "x-mock-user-id": "manager.approver",
-          },
+          headers,
         },
         fallbackData: null,
         resourceLabel: `Case graph ${caseId}`,

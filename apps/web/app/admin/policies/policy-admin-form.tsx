@@ -17,8 +17,9 @@ import {
   type AdminRoutingConfig,
 } from "@finance-ops/shared";
 import { useState, useTransition } from "react";
+import { getApiBaseUrl, getClientAuthHeaders } from "../../lib/client-session";
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
+const apiBaseUrl = getApiBaseUrl() ?? DEFAULT_API_BASE_URL;
 
 type PolicyAdminFormProps = {
   initialPolicy: AdminPolicyConfig;
@@ -147,8 +148,7 @@ export function PolicyAdminForm({
 
         const headers = {
           "Content-Type": "application/json",
-          "x-mock-role": "ADMIN",
-          "x-mock-user-id": "admin.user",
+          ...getClientAuthHeaders(),
         };
 
         const [policyResponse, routingResponse, delegationResponse, approvalMatrixResponse] = await Promise.all([

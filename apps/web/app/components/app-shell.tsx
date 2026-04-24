@@ -1,13 +1,16 @@
 "use client";
 
+import type { SessionUser } from "@finance-ops/shared";
 import { useId, useState, type ReactNode } from "react";
+import { clearClientAccessToken } from "../lib/client-session";
 
 type AppShellProps = {
   sidebar: ReactNode;
   children: ReactNode;
+  user: SessionUser | null;
 };
 
-export function AppShell({ sidebar, children }: AppShellProps) {
+export function AppShell({ sidebar, children, user }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const sidebarRegionId = useId();
 
@@ -41,8 +44,27 @@ export function AppShell({ sidebar, children }: AppShellProps) {
             </div>
           </div>
           <div className="topbar-actions">
-            <span className="topbar-chip">AI Copilot Active</span>
-            <span className="avatar-badge">AC</span>
+            <span className="topbar-chip">
+              {user ? `${user.roles.join(" / ")} active` : "No active session"}
+            </span>
+            {user ? (
+              <>
+                <span className="topbar-chip">{user.displayName}</span>
+                <button
+                  type="button"
+                  className="button-secondary"
+                  onClick={() => {
+                    clearClientAccessToken();
+                    window.location.href = "/login";
+                  }}
+                >
+                  Sign out
+                </button>
+                <span className="avatar-badge">{user.displayName.slice(0, 2).toUpperCase()}</span>
+              </>
+            ) : (
+              <span className="avatar-badge">--</span>
+            )}
           </div>
         </div>
         <div className="app-main-scroll">{children}</div>

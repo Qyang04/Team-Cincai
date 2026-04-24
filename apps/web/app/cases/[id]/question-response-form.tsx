@@ -3,8 +3,9 @@
 import { DEFAULT_API_BASE_URL, questionResponseActionResponseSchema } from "@finance-ops/shared";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { getApiBaseUrl, getClientAuthHeaders } from "../../lib/client-session";
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
+const apiBaseUrl = getApiBaseUrl() ?? DEFAULT_API_BASE_URL;
 
 type QuestionResponseFormProps = {
   caseId: string;
@@ -31,7 +32,7 @@ export function QuestionResponseForm({ caseId, questionId }: QuestionResponseFor
       try {
         const response = await fetch(`${apiBaseUrl}/cases/${caseId}/questions/${questionId}/respond`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...getClientAuthHeaders() },
           body: JSON.stringify({ answer }),
         });
 

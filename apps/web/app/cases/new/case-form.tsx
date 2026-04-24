@@ -10,6 +10,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition, type ClipboardEvent, type DragEvent } from "react";
+import { getApiBaseUrl, getClientAuthHeaders } from "../../lib/client-session";
 
 const workflowOptions: ReadonlyArray<{ value: WorkflowType; label: string }> = [
   { value: "EXPENSE_CLAIM", label: "Expense claim" },
@@ -18,7 +19,7 @@ const workflowOptions: ReadonlyArray<{ value: WorkflowType; label: string }> = [
   { value: "INTERNAL_PAYMENT_REQUEST", label: "Internal payment request" },
 ] as const;
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
+const apiBaseUrl = getApiBaseUrl() ?? DEFAULT_API_BASE_URL;
 
 type SubmissionState =
   | { kind: "idle" }
@@ -61,22 +62,6 @@ export function CaseForm() {
   const [isPending, startTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const router = useRouter();
-
-  function addFilenames(names: string[]) {
-    const trimmed = names.map((name) => name.trim()).filter(Boolean);
-    if (!trimmed.length) return;
-    setFilenames((current) => {
-      const seen = new Set(current);
-      const merged = [...current];
-      for (const name of trimmed) {
-        if (!seen.has(name)) {
-          seen.add(name);
-          merged.push(name);
-        }
-      }
-      return merged;
-    });
-  }
 
   function addStagedFiles(files: File[]) {
     if (!files.length) return;
@@ -134,7 +119,6 @@ export function CaseForm() {
     setState({ kind: "idle" });
 
     const workflowType = String(formData.get("workflowType") ?? "EXPENSE_CLAIM");
-    const requesterId = String(formData.get("requesterId") ?? "").trim() || "demo.requester";
     const notes = String(formData.get("notes") ?? "");
     const submittedFilenames = filenames.map((name) => name.trim()).filter(Boolean);
     const filesToUpload = [...stagedFiles];
@@ -149,8 +133,7 @@ export function CaseForm() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-mock-user-id": requesterId,
-            "x-mock-role": "REQUESTER",
+            ...getClientAuthHeaders(),
           },
           body: JSON.stringify({ workflowType }),
         });
@@ -163,10 +146,7 @@ export function CaseForm() {
 
         const created = createCaseResponseSchema.parse(await createResponse.json());
 
-        const authHeaders = {
-          "x-mock-user-id": requesterId,
-          "x-mock-role": "REQUESTER",
-        } as const;
+        const authHeaders = getClientAuthHeaders();
 
         for (const file of filesToUpload) {
           const uploadBody = new FormData();
@@ -354,16 +334,6 @@ export function CaseForm() {
                 </option>
               ))}
             </select>
-          </label>
-
-          <label className="field">
-            <span className="field-label">Requester ID</span>
-            <input
-              name="requesterId"
-              defaultValue="demo.requester"
-              className="field-control"
-              suppressHydrationWarning
-            />
           </label>
         </div>
 

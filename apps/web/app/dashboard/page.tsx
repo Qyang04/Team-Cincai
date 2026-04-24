@@ -1,19 +1,17 @@
 import { DEFAULT_API_BASE_URL, caseListResponseSchema, type CaseListItem } from "@finance-ops/shared";
 import Link from "next/link";
+import { getServerAuthHeaders } from "../lib/session";
 import { fetchApiJson } from "../lib/server-api";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
-const dashboardHeaders = {
-  "x-mock-role": "ADMIN",
-  "x-mock-user-id": "admin.user",
-};
 
 async function getCases(): Promise<{ cases: CaseListItem[]; isLive: boolean; errorMessage: string | null }> {
+  const headers = await getServerAuthHeaders();
   const result = await fetchApiJson<CaseListItem[]>({
     url: `${apiBaseUrl}/cases`,
     init: {
       cache: "no-store",
-      headers: dashboardHeaders,
+      headers,
     },
     fallbackData: [],
     resourceLabel: "Case list",

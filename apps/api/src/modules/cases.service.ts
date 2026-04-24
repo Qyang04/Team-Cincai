@@ -1,13 +1,27 @@
 import { Injectable } from "@nestjs/common";
 import type { WorkflowType } from "@finance-ops/shared";
+import type { AuthenticatedUser } from "./auth.types";
 import { PrismaService } from "./prisma.service";
 
 @Injectable()
 export class CasesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  listCases() {
+  listCases(user?: AuthenticatedUser) {
+    const where =
+      !user || user.roles.includes("ADMIN")
+        ? undefined
+        : {
+            OR: [
+              ...(user.roles.includes("REQUESTER") ? [{ requesterId: user.id }] : []),
+              ...(user.roles.includes("APPROVER") ? [{ approvalTasks: { some: { approverId: user.id } } }] : []),
+              ...(user.roles.includes("FINANCE_REVIEWER")
+                ? [{ financeReviews: { some: { OR: [{ reviewerId: user.id }, { ownerId: user.id }] } } }]
+                : []),
+            ],
+          };
     return this.prisma.case.findMany({
+      ...(where ? { where } : {}),
       orderBy: { createdAt: "desc" },
       include: { artifacts: true },
     });

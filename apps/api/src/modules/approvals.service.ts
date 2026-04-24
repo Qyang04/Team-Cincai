@@ -1,6 +1,5 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import {
-  type AdminApprovalMatrixStageTemplate,
   type AdminRoutingConfig,
   type AdminDelegationConfig,
   type PolicyCheckResult,
@@ -10,6 +9,7 @@ import {
 import { AdminConfigService } from "./admin-config.service";
 import { NotificationsService } from "./notifications.service";
 import { PrismaService } from "./prisma.service";
+import { UserDirectoryService } from "./user-directory.service";
 
 function toIsoDateTimeString(value: Date | string | null | undefined) {
   if (value === null || value === undefined) {
@@ -43,6 +43,7 @@ export class ApprovalsService implements OnModuleInit, OnModuleDestroy {
     private readonly prisma: PrismaService,
     private readonly adminConfigService: AdminConfigService,
     private readonly notificationsService: NotificationsService,
+    private readonly userDirectoryService: UserDirectoryService,
   ) {}
 
   onModuleInit() {
@@ -80,60 +81,6 @@ export class ApprovalsService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  private extractAmount(fieldsJson: unknown): number {
-    const fields = (fieldsJson as Record<string, unknown> | null | undefined) ?? {};
-    return typeof fields.amount === "number" ? fields.amount : 0;
-  }
-
-  private extractString(fieldsJson: unknown, key: string): string | null {
-    const fields = (fieldsJson as Record<string, unknown> | null | undefined) ?? {};
-    const value = fields[key];
-    if (typeof value !== "string") {
-      return null;
-    }
-    const normalized = value.trim();
-    return normalized.length ? normalized : null;
-  }
-
-  private templateMatches(input: {
-    template: AdminApprovalMatrixStageTemplate;
-    workflowType: string;
-    amount: number;
-    department: string | null;
-    costCenter: string | null;
-  }): boolean {
-    const conditions = input.template.conditions;
-    if (!conditions) {
-      return true;
-    }
-    if (conditions.workflowTypes?.length && !conditions.workflowTypes.includes(input.workflowType as never)) {
-      return false;
-    }
-    if (conditions.minAmount !== undefined && input.amount < conditions.minAmount) {
-      return false;
-    }
-    if (conditions.maxAmount !== undefined && input.amount > conditions.maxAmount) {
-      return false;
-    }
-    if (conditions.departments?.length) {
-      const currentDepartment = input.department?.toLowerCase() ?? "";
-      const allowed = conditions.departments.map((value) => value.trim().toLowerCase());
-      if (!allowed.includes(currentDepartment)) {
-        return false;
-      }
-    }
-    if (conditions.costCenterPrefixes?.length) {
-      const currentCostCenter = input.costCenter?.toUpperCase() ?? "";
-      const matches = conditions.costCenterPrefixes.some((prefix) =>
-        currentCostCenter.startsWith(prefix.trim().toUpperCase()),
-      );
-      if (!matches) {
-        return false;
-      }
-    }
-    return true;
-  }
-
   async createMatrixTasks(input: {
     caseId: string;
     workflowType: string;
@@ -142,132 +89,25 @@ export class ApprovalsService implements OnModuleInit, OnModuleDestroy {
     routingConfig: AdminRoutingConfig;
     managerApprovalThreshold: number;
   }) {
-    const amount = this.extractAmount(input.latestExtractionFields);
-    const defaultApproverId = input.routingConfig.defaultApproverId;
-    const financeReviewerId = input.routingConfig.financeReviewerId;
-    const directorApproverId = "director.approver";
-    const complianceApproverId = "compliance.approver";
-    const financeControllerApproverId = "finance.controller";
-    const procurementApproverId = "procurement.approver";
-    const treasuryApproverId = "treasury.approver";
-    const department = this.extractString(input.latestExtractionFields, "department")?.toLowerCase() ?? null;
-    const costCenter = this.extractString(input.latestExtractionFields, "costCenter")?.toUpperCase() ?? null;
-
-    let stages: MatrixStageDefinition[] =
-      [
-        {
-          stageNumber: 1,
-          stageMode: "SEQUENTIAL",
-          stageLabel: "Line manager approval",
-          approverIds: [defaultApproverId],
-          dependencyType: "ALL_REQUIRED",
-          requiredApprovals: 1,
-          slaHours: input.routingConfig.escalationWindowHours,
-          escalatesTo: directorApproverId,
-        },
-      ];
-
-    const templateConfig = await this.adminConfigService.getApprovalMatrixConfig();
-    const configuredStages = templateConfig.templates
-      .filter((template) => template.enabled)
-      .sort((a, b) => a.stageOrder - b.stageOrder)
-      .filter((template) =>
-        this.templateMatches({
-          template,
-          workflowType: input.workflowType,
-          amount,
-          department,
-          costCenter,
-        }),
-      )
-      .map((template, index) => ({
-        stageNumber: index + 1,
-        stageMode: template.mode,
-        stageLabel: template.label,
-        approverIds: template.approverIds,
-        dependencyType: template.dependencyType,
-        requiredApprovals: template.requiredApprovals ?? 1,
-        slaHours: template.slaHours ?? input.routingConfig.escalationWindowHours,
-        escalatesTo: template.escalatesTo ?? undefined,
-      }));
-
-    if (configuredStages.length) {
-      stages = configuredStages;
-    }
-
-    if (amount > input.managerApprovalThreshold) {
-      stages.push({
-        stageNumber: stages.length + 1,
+    const caseRecord = await this.prisma.case.findUnique({
+      where: { id: input.caseId },
+      select: { requesterId: true },
+    });
+    const requester = caseRecord?.requesterId
+      ? await this.userDirectoryService.getUserById(caseRecord.requesterId)
+      : null;
+    const defaultApproverId = requester?.managerUserId ?? input.routingConfig.defaultApproverId;
+    const stages: MatrixStageDefinition[] = [
+      {
+        stageNumber: 1,
         stageMode: "SEQUENTIAL",
-        stageLabel: "Department head approval",
-        approverIds: [directorApproverId],
+        stageLabel: "Manager approval",
+        approverIds: [defaultApproverId],
         dependencyType: "ALL_REQUIRED",
         requiredApprovals: 1,
         slaHours: input.routingConfig.escalationWindowHours,
-        escalatesTo: financeReviewerId,
-      });
-    }
-
-    if (input.workflowType === "INTERNAL_PAYMENT_REQUEST") {
-      stages.push({
-        stageNumber: stages.length + 1,
-        stageMode: "PARALLEL",
-        stageLabel: "Parallel risk checks",
-        approverIds: [complianceApproverId, financeReviewerId],
-        dependencyType: "MIN_N",
-        requiredApprovals: 1,
-        slaHours: input.routingConfig.escalationWindowHours,
-      });
-    }
-
-    if (input.workflowType === "VENDOR_INVOICE_APPROVAL") {
-      stages.push({
-        stageNumber: stages.length + 1,
-        stageMode: "SEQUENTIAL",
-        stageLabel: "Finance coding review",
-        approverIds: [financeReviewerId],
-        dependencyType: "ALL_REQUIRED",
-        requiredApprovals: 1,
-        slaHours: input.routingConfig.escalationWindowHours,
-      });
-    }
-
-    if (department === "procurement") {
-      stages.push({
-        stageNumber: stages.length + 1,
-        stageMode: "SEQUENTIAL",
-        stageLabel: "Procurement control sign-off",
-        approverIds: [procurementApproverId],
-        dependencyType: "ALL_REQUIRED",
-        requiredApprovals: 1,
-        slaHours: input.routingConfig.escalationWindowHours,
-      });
-    }
-
-    if (department === "treasury") {
-      stages.push({
-        stageNumber: stages.length + 1,
-        stageMode: "SEQUENTIAL",
-        stageLabel: "Treasury liquidity check",
-        approverIds: [treasuryApproverId],
-        dependencyType: "ALL_REQUIRED",
-        requiredApprovals: 1,
-        slaHours: input.routingConfig.escalationWindowHours,
-      });
-    }
-
-    if (costCenter?.startsWith("FIN")) {
-      stages.push({
-        stageNumber: stages.length + 1,
-        stageMode: "PARALLEL",
-        stageLabel: "Finance oversight confirmation",
-        approverIds: [financeControllerApproverId, financeReviewerId],
-        dependencyType: "ANY_ONE",
-        requiredApprovals: 1,
-        slaHours: input.routingConfig.escalationWindowHours,
-        escalatesTo: directorApproverId,
-      });
-    }
+      },
+    ];
 
     const created = await this.prisma.$transaction(async (tx) => {
       await tx.approvalTask.deleteMany({ where: { caseId: input.caseId } });
@@ -337,12 +177,15 @@ export class ApprovalsService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  async listPendingTasks(): Promise<ApprovalQueueItem[]> {
+  async listPendingTasks(userId?: string, includeAll = false): Promise<ApprovalQueueItem[]> {
     if ("approvalStage" in this.prisma && this.prisma.approvalStage) {
       await this.runSlaBreachSweep();
     }
     const tasks = await this.prisma.approvalTask.findMany({
-      where: { status: "PENDING" },
+      where:
+        includeAll || !userId
+          ? { status: "PENDING" }
+          : { status: "PENDING", approverId: userId },
       orderBy: { createdAt: "asc" },
       include: { case: true, stage: true },
     });

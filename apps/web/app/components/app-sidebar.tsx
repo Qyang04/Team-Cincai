@@ -1,8 +1,9 @@
+import type { SessionUser } from "@finance-ops/shared";
 import Link from "next/link";
 import { ShellNav } from "../shell-nav";
-import { PRIMARY_NAV_ITEMS } from "./nav-config";
+import { getPrimaryNavItems } from "./nav-config";
 
-export function AppSidebar() {
+export function AppSidebar({ user }: { user: SessionUser | null }) {
   return (
     <aside className="app-rail app-sidebar" aria-label="Primary navigation">
       <div className="rail-top">
@@ -18,17 +19,23 @@ export function AppSidebar() {
         </p>
       </div>
 
-      <ShellNav navItems={PRIMARY_NAV_ITEMS} />
+      <ShellNav navItems={getPrimaryNavItems(user)} />
 
       <div className="rail-footer">
         <div className="rail-card rail-card-dark">
           <p className="rail-label">System status</p>
           <strong>98.8% pipeline health</strong>
-          <p className="muted">Intake, approval, and export connectors are available for demo workflows.</p>
+          <p className="muted">
+            {user
+              ? `${user.displayName} signed in with ${user.roles.join(", ").toLowerCase()} access.`
+              : "Sign in to load your workflow lanes and queue access."}
+          </p>
         </div>
-        <Link href="/cases/new" className="button-primary button-block">
-          New Case
-        </Link>
+        {user && (user.roles.includes("REQUESTER") || user.roles.includes("ADMIN")) ? (
+          <Link href="/cases/new" className="button-primary button-block">
+            New Case
+          </Link>
+        ) : null}
       </div>
     </aside>
   );

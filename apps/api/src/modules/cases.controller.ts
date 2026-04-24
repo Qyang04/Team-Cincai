@@ -32,6 +32,7 @@ import {
 import { ApprovalsService } from "./approvals.service";
 import { ArtifactsService } from "./artifacts.service";
 import { AuditService } from "./audit.service";
+import { AuthorizationService } from "./authorization.service";
 import { CaseDetailService } from "./case-detail.service";
 import { CasesService } from "./cases.service";
 import {
@@ -148,18 +149,22 @@ export class CasesController {
     private readonly approvalsService: ApprovalsService,
     private readonly financeReviewService: FinanceReviewService,
     private readonly exportsService: ExportsService,
+    private readonly authorizationService: AuthorizationService,
     private readonly storageService: StorageService,
     private readonly localArtifactStorage: LocalArtifactStorageService,
     private readonly workflowOrchestrator: WorkflowOrchestratorService,
   ) {}
 
   @Get()
-  listCases() {
-    return this.casesService.listCases();
+  listCases(@CurrentUser() user: AuthenticatedUser) {
+    return this.casesService.listCases(user);
   }
 
   @Get(":id")
-  getCase(@Param("id") id: string) {
+  async getCase(@Param("id") id: string, @CurrentUser() user: AuthenticatedUser) {
+    if (!(await this.authorizationService.canViewCase(user, id))) {
+      throw new ForbiddenException("You do not have access to this case.");
+    }
     return this.caseDetailService.getCaseDetail(id);
   }
 
@@ -181,12 +186,20 @@ export class CasesController {
   @Post(":id/submit")
   async submitCase(
     @Param("id") id: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Body()
     body: {
       notes?: string;
       filenames?: string[];
     },
   ) {
+    const caseRecord = await this.casesService.getCase(id);
+    if (!caseRecord) {
+      throw new NotFoundException("Case not found");
+    }
+    if (caseRecord.requesterId !== user.id && !user.roles.includes("ADMIN")) {
+      throw new ForbiddenException("Only the requester or an admin can submit this case.");
+    }
     const input = submitCaseSchema.parse(body);
     const result = await this.workflowOrchestrator.submitDraftCase(id, input);
     if (result && typeof result === "object" && "error" in result) {
@@ -196,12 +209,22 @@ export class CasesController {
   }
 
   @Get(":id/artifacts")
-  getArtifacts(@Param("id") id: string) {
+  async getArtifacts(@Param("id") id: string, @CurrentUser() user: AuthenticatedUser) {
+    if (!(await this.authorizationService.canViewCase(user, id))) {
+      throw new ForbiddenException("You do not have access to this case.");
+    }
     return this.artifactsService.listForCase(id);
   }
 
   @Get(":id/artifacts/:artifactId/file")
-  async getArtifactFile(@Param("id") caseId: string, @Param("artifactId") artifactId: string) {
+  async getArtifactFile(
+    @Param("id") caseId: string,
+    @Param("artifactId") artifactId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    if (!(await this.authorizationService.canViewCase(user, caseId))) {
+      throw new ForbiddenException("You do not have access to this case.");
+    }
     const artifact = await this.artifactsService.getArtifact(artifactId);
     if (!artifact || artifact.caseId !== caseId) {
       throw new NotFoundException("Artifact not found");
@@ -343,7 +366,10 @@ export class CasesController {
   }
 
   @Get(":id/questions")
-  getQuestions(@Param("id") id: string) {
+  async getQuestions(@Param("id") id: string, @CurrentUser() user: AuthenticatedUser) {
+    if (!(await this.authorizationService.canViewCase(user, id))) {
+      throw new ForbiddenException("You do not have access to this case.");
+    }
     return this.intakeService.listQuestions(id);
   }
 
@@ -351,11 +377,19 @@ export class CasesController {
   async answerQuestion(
     @Param("id") id: string,
     @Param("questionId") questionId: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Body()
     body: {
       answer: string;
     },
   ): Promise<QuestionResponseActionResponse> {
+    const caseRecordBeforeAnswer = await this.casesService.getCase(id);
+    if (!caseRecordBeforeAnswer) {
+      throw new NotFoundException("Case not found");
+    }
+    if (caseRecordBeforeAnswer.requesterId !== user.id && !user.roles.includes("ADMIN")) {
+      throw new ForbiddenException("Only the requester or an admin can answer these questions.");
+    }
     const input = answerQuestionSchema.parse(body);
     const answered = await this.intakeService.answerQuestion(id, questionId, input.answer);
     const caseRecord = await this.casesService.getCase(id);
@@ -367,7 +401,7 @@ export class CasesController {
       caseId: id,
       eventType: "QUESTION_ANSWERED",
       actorType: "REQUESTER",
-      actorId: caseRecord?.requesterId,
+      actorId: user.id,
       payload: {
         questionId,
         answer: input.answer,
@@ -439,29 +473,41 @@ export class CasesController {
   }
 
   @Get(":id/transitions")
-  getTransitions(@Param("id") id: string) {
+  async getTransitions(@Param("id") id: string, @CurrentUser() user: AuthenticatedUser) {
+    if (!(await this.authorizationService.canViewCase(user, id))) {
+      throw new ForbiddenException("You do not have access to this case.");
+    }
     return this.casesService.getTransitions(id);
   }
 
   @Get(":id/audit-events")
-  getAuditEvents(@Param("id") id: string) {
+  async getAuditEvents(@Param("id") id: string, @CurrentUser() user: AuthenticatedUser) {
+    if (!(await this.authorizationService.canViewCase(user, id))) {
+      throw new ForbiddenException("You do not have access to this case.");
+    }
     return this.auditService.listForCase(id);
   }
 
   @Post(":id/policy-review/run")
-  runPolicyReview(@Param("id") id: string) {
+  async runPolicyReview(@Param("id") id: string, @CurrentUser() user: AuthenticatedUser) {
+    if (!(await this.authorizationService.canViewCase(user, id))) {
+      throw new ForbiddenException("You do not have access to this case.");
+    }
     return this.workflowOrchestrator.runPolicyAndRoute(id);
   }
 
   @Get(":id/policy-result")
-  getLatestPolicyResult(@Param("id") id: string) {
+  async getLatestPolicyResult(@Param("id") id: string, @CurrentUser() user: AuthenticatedUser) {
+    if (!(await this.authorizationService.canViewCase(user, id))) {
+      throw new ForbiddenException("You do not have access to this case.");
+    }
     return this.policyService.getLatestPolicyResult(id);
   }
 
   @Get("/approvals/tasks")
   @Roles("APPROVER", "ADMIN")
-  listApprovalTasks() {
-    return this.approvalsService.listPendingTasks();
+  listApprovalTasks(@CurrentUser() user: AuthenticatedUser) {
+    return this.approvalsService.listPendingTasks(user.id, user.roles.includes("ADMIN"));
   }
 
   @Get("/approvals/analytics")
@@ -490,6 +536,9 @@ export class CasesController {
     const task = await this.approvalsService.getTask(taskId);
     if (!task) {
       return createErrorActionResponse<ApprovalActionResponse>("Approval task not found");
+    }
+    if (!(await this.authorizationService.canManageApprovalTask(user, taskId))) {
+      return createErrorActionResponse<ApprovalActionResponse>("Only the assigned approver or an admin can approve");
     }
 
     await this.approvalsService.markApproved(taskId, input.decisionReason, input.approverId);
@@ -565,6 +614,9 @@ export class CasesController {
     if (!task) {
       return createErrorActionResponse<ApprovalActionResponse>("Approval task not found");
     }
+    if (!(await this.authorizationService.canManageApprovalTask(user, taskId))) {
+      return createErrorActionResponse<ApprovalActionResponse>("Only the assigned approver or an admin can reject");
+    }
 
     await this.approvalsService.markRejected(taskId, input.decisionReason, input.approverId);
     await this.approvalsService.cancelRemaining(task.caseId, taskId);
@@ -599,6 +651,11 @@ export class CasesController {
     const task = await this.approvalsService.getTask(taskId);
     if (!task) {
       return createErrorActionResponse<ApprovalActionResponse>("Approval task not found");
+    }
+    if (!(await this.authorizationService.canManageApprovalTask(user, taskId))) {
+      return createErrorActionResponse<ApprovalActionResponse>(
+        "Only the assigned approver or an admin can request follow-up information",
+      );
     }
 
     await this.approvalsService.requestInfo(taskId, input.question, input.approverId);
@@ -677,8 +734,8 @@ export class CasesController {
 
   @Get("/finance-review/cases")
   @Roles("FINANCE_REVIEWER", "ADMIN")
-  listFinanceReviewCases() {
-    return this.financeReviewService.listOpenCases();
+  listFinanceReviewCases(@CurrentUser() user: AuthenticatedUser) {
+    return this.financeReviewService.listOpenCases(user.id, user.roles.includes("ADMIN"));
   }
 
   @Post("/finance-review/:reviewId/approve")
@@ -700,6 +757,11 @@ export class CasesController {
       annotation: typeof parsedBody.annotation === "string" ? parsedBody.annotation : undefined,
       note: typeof parsedBody.note === "string" ? parsedBody.note : undefined,
     });
+    if (!(await this.authorizationService.canManageFinanceReview(user, reviewId))) {
+      return createErrorActionResponse<FinanceReviewActionResponse>(
+        "Only the assigned finance reviewer or an admin can approve this review",
+      );
+    }
     const review = await this.financeReviewService.resolveWithDetails({
       reviewId,
       reviewerId: input.reviewerId,
@@ -758,6 +820,11 @@ export class CasesController {
       annotation: typeof parsedBody.annotation === "string" ? parsedBody.annotation : undefined,
       note: typeof parsedBody.note === "string" ? parsedBody.note : undefined,
     });
+    if (!(await this.authorizationService.canManageFinanceReview(user, reviewId))) {
+      return createErrorActionResponse<FinanceReviewActionResponse>(
+        "Only the assigned finance reviewer or an admin can reject this review",
+      );
+    }
     const review = await this.financeReviewService.resolveWithDetails({
       reviewId,
       reviewerId: input.reviewerId,
@@ -807,6 +874,11 @@ export class CasesController {
       annotation: typeof parsedBody.annotation === "string" ? parsedBody.annotation : undefined,
       note: typeof parsedBody.note === "string" ? parsedBody.note : undefined,
     });
+    if (!(await this.authorizationService.canManageFinanceReview(user, reviewId))) {
+      return createErrorActionResponse<FinanceReviewActionResponse>(
+        "Only the assigned finance reviewer or an admin can send this review back",
+      );
+    }
     const review = await this.financeReviewService.resolveWithDetails({
       reviewId,
       reviewerId: input.reviewerId,
@@ -846,6 +918,11 @@ export class CasesController {
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<FinanceReviewActionResponse> {
     const input = financeAssignSchema.parse(body);
+    if (!(await this.authorizationService.canManageFinanceReview(user, reviewId))) {
+      return createErrorActionResponse<FinanceReviewActionResponse>(
+        "Only the assigned finance reviewer or an admin can assign ownership",
+      );
+    }
     const review = await this.financeReviewService.assignOwner(reviewId, input.ownerId);
     await this.auditService.recordEvent({
       caseId: review.caseId,
@@ -871,12 +948,18 @@ export class CasesController {
   }
 
   @Get(":id/export")
-  getExportRecord(@Param("id") id: string) {
+  async getExportRecord(@Param("id") id: string, @CurrentUser() user: AuthenticatedUser) {
+    if (!(await this.authorizationService.canViewCase(user, id))) {
+      throw new ForbiddenException("You do not have access to this case.");
+    }
     return this.exportsService.getLatest(id);
   }
 
   @Post(":id/export")
-  async processExport(@Param("id") id: string): Promise<ExportActionResponse> {
+  async processExport(@Param("id") id: string, @CurrentUser() user: AuthenticatedUser): Promise<ExportActionResponse> {
+    if (!(await this.authorizationService.canViewCase(user, id))) {
+      return createErrorActionResponse<ExportActionResponse>("You do not have access to this case.");
+    }
     const result = await this.workflowOrchestrator.processExport(id);
     if (result && typeof result === "object" && "error" in result) {
       return createErrorActionResponse<ExportActionResponse>(String(result.error));

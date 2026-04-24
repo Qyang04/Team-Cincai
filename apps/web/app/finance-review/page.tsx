@@ -1,19 +1,18 @@
 import { DEFAULT_API_BASE_URL, financeReviewQueueResponseSchema, type FinanceReviewQueueItem } from "@finance-ops/shared";
 import Link from "next/link";
+import { getServerAuthHeaders } from "../lib/session";
 import { fetchApiJson } from "../lib/server-api";
 import { FinanceReviewActionForm } from "./finance-review-action-form";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
 
 async function getFinanceReviewCases(): Promise<{ reviews: FinanceReviewQueueItem[]; errorMessage: string | null }> {
+  const headers = await getServerAuthHeaders();
   const result = await fetchApiJson<FinanceReviewQueueItem[]>({
     url: `${apiBaseUrl}/cases/finance-review/cases`,
     init: {
       cache: "no-store",
-      headers: {
-        "x-mock-role": "FINANCE_REVIEWER",
-        "x-mock-user-id": "finance.reviewer",
-      },
+      headers,
     },
     fallbackData: [],
     resourceLabel: "Finance review queue",

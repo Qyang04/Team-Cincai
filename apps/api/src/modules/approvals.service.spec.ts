@@ -18,6 +18,7 @@ test("ApprovalsService reopens an info-requested task as pending and clears prio
     prisma as never,
     { getDelegationConfig: async () => ({ rules: [] }) } as never,
     { send: async () => ({ delivered: true }) } as never,
+    { getUserById: async () => null } as never,
   );
   await service.reopenTask("task-1");
 
@@ -47,6 +48,7 @@ test("ApprovalsService fetches the latest approval task waiting for requester fo
     prisma as never,
     { getDelegationConfig: async () => ({ rules: [] }) } as never,
     { send: async () => ({ delivered: true }) } as never,
+    { getUserById: async () => null } as never,
   );
   const task = await service.getLatestInfoRequestedTask("case-1");
 
@@ -77,6 +79,7 @@ test("ApprovalsService lists only pending tasks and includes case context for th
     prisma as never,
     { getDelegationConfig: async () => ({ rules: [] }) } as never,
     { send: async () => ({ delivered: true }) } as never,
+    { getUserById: async () => null } as never,
   );
   await service.listPendingTasks();
 
@@ -131,6 +134,7 @@ test("ApprovalsService makes a reopened task visible in the pending approval que
     prisma as never,
     { getDelegationConfig: async () => ({ rules: [] }) } as never,
     { send: async () => ({ delivered: true }) } as never,
+    { getUserById: async () => null } as never,
   );
 
   await service.reopenTask("task-1");
@@ -201,6 +205,7 @@ test("ApprovalsService escalates overdue stages with escalation targets", async 
         return { delivered: true };
       },
     } as never,
+    { getUserById: async () => null } as never,
   );
 
   const result = await service.runSlaBreachSweep();
@@ -244,6 +249,7 @@ test("ApprovalsService sends reminders for overdue stages without escalation", a
         return { delivered: true };
       },
     } as never,
+    { getUserById: async () => null } as never,
   );
 
   const result = await service.runSlaBreachSweep();
