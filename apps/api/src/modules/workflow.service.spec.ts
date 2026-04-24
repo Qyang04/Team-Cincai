@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { WorkflowService } from "./workflow.service";
 
 function createWorkflowServiceHarness(initialStatus: string | null) {
-  const state = { status: initialStatus };
+  const state = { status: initialStatus, assignedTo: null as string | null };
   const workflowTransitions: Array<Record<string, unknown>> = [];
   const auditEvents: Array<Record<string, unknown>> = [];
   const telemetryCalls: string[] = [];
@@ -15,11 +15,20 @@ function createWorkflowServiceHarness(initialStatus: string | null) {
         state.status = data.status;
         return { id: "case-1", status: state.status };
       },
-      updateMany: async ({ where, data }: { where: { status: string }; data: { status: string } }) => {
+      updateMany: async ({
+        where,
+        data,
+      }: {
+        where: { status: string };
+        data: { status: string; assignedTo?: string | null };
+      }) => {
         if (state.status !== where.status) {
           return { count: 0 };
         }
         state.status = data.status;
+        if ("assignedTo" in data) {
+          state.assignedTo = data.assignedTo ?? null;
+        }
         return { count: 1 };
       },
     },
@@ -69,13 +78,30 @@ test("WorkflowService transitions a case when the persisted status matches the r
     actorType: "APPROVER",
     actorId: "manager.approver",
     note: "Looks good.",
+    assignedTo: null,
   });
 
   assert.equal(updated.status, "APPROVED");
   assert.equal(harness.state.status, "APPROVED");
+  assert.equal(harness.state.assignedTo, null);
   assert.equal(harness.workflowTransitions.length, 1);
   assert.equal(harness.auditEvents.length, 1);
   assert.ok(harness.telemetryCalls.includes("increment:workflow.transition.AWAITING_APPROVAL.APPROVED"));
+});
+
+test("WorkflowService updates case ownership when a transition provides an assigned user", async () => {
+  const harness = createWorkflowServiceHarness("POLICY_REVIEW");
+
+  await harness.service.transitionCase({
+    caseId: "case-1",
+    from: "POLICY_REVIEW",
+    to: "AWAITING_APPROVAL",
+    actorType: "SYSTEM",
+    assignedTo: "manager.approver",
+  });
+
+  assert.equal(harness.state.status, "AWAITING_APPROVAL");
+  assert.equal(harness.state.assignedTo, "manager.approver");
 });
 
 test("WorkflowService rejects invalid transition edges before attempting writes", async () => {

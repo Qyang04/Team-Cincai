@@ -111,6 +111,18 @@ test("CaseDetailService returns additive summary fields alongside the existing n
 
   assert.equal(detail?.stage, "AWAITING_APPROVAL");
   assert.equal(detail?.manualActionRequired, true);
+  assert.deepEqual(detail?.artifactSummary, {
+    total: 0,
+    prepared: 0,
+    uploaded: 0,
+    processing: 0,
+    processed: 0,
+    failed: 0,
+    latestStatus: null,
+    allProcessed: false,
+    hasFailures: false,
+    summary: "No artifacts attached yet.",
+  });
   assert.equal(detail?.reasoningSummary, "Ready for approval review.");
   assert.equal(detail?.recommendedAction, "approval_decision_required");
   assert.equal(detail?.failureMode, null);
@@ -176,6 +188,7 @@ test("CaseDetailService marks export-ready cases as not requiring manual action"
   const detail = await service.getCaseDetail("case-2");
 
   assert.equal(detail?.manualActionRequired, false);
+  assert.equal(detail?.artifactSummary.processed, 1);
   assert.equal(detail?.recommendedAction, "run_export");
   assert.equal(detail?.failureMode, null);
   assert.deepEqual(detail?.exportReadinessSummary, {
@@ -225,6 +238,7 @@ test("CaseDetailService derives export failure mode and recovery guidance from r
   const detail = await service.getCaseDetail("case-3");
 
   assert.equal(detail?.manualActionRequired, true);
+  assert.equal(detail?.artifactSummary.total, 0);
   assert.equal(detail?.recommendedAction, "recover_case");
   assert.equal(detail?.failureMode, "EXPORT_FAILURE");
   assert.deepEqual(detail?.exportReadinessSummary, {

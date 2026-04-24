@@ -9,6 +9,7 @@ import Link from "next/link";
 import { getServerAuthHeaders } from "../../lib/session";
 import { fetchApiJson } from "../../lib/server-api";
 import { ArtifactPreviewDialog } from "./artifact-preview-dialog";
+import { ArtifactRetryForm } from "./artifact-retry-form";
 import { ExportActionForm } from "./export-action-form";
 import { QuestionResponseForm } from "./question-response-form";
 import { RefreshButton } from "./refresh-button";
@@ -200,6 +201,10 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
               <p className="detail-label">Finance reviews</p>
               <strong>{caseDetail.financeReviews.length}</strong>
             </div>
+            <div className="case-metric-box">
+              <p className="detail-label">Evidence readiness</p>
+              <strong>{caseDetail.artifactSummary.summary}</strong>
+            </div>
           </div>
         </div>
       </section>
@@ -304,6 +309,9 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
                   ) : null}
                   {artifact.extractedText ? <div className="muted">Extracted: {artifact.extractedText}</div> : null}
                   {artifact.errorMessage ? <div className="text-danger">Error: {artifact.errorMessage}</div> : null}
+                  {artifact.processingStatus === "FAILED" ? (
+                    <ArtifactRetryForm caseId={caseDetail.id} artifactId={artifact.id} />
+                  ) : null}
                 </div>
               ))}
             </div>

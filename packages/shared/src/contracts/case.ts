@@ -77,6 +77,20 @@ export const caseArtifactSchema = z.object({
 });
 export type CaseArtifact = z.infer<typeof caseArtifactSchema>;
 
+export const artifactProcessingSummarySchema = z.object({
+  total: z.number().int().nonnegative(),
+  prepared: z.number().int().nonnegative(),
+  uploaded: z.number().int().nonnegative(),
+  processing: z.number().int().nonnegative(),
+  processed: z.number().int().nonnegative(),
+  failed: z.number().int().nonnegative(),
+  latestStatus: nullableStringSchema.optional(),
+  allProcessed: z.boolean(),
+  hasFailures: z.boolean(),
+  summary: z.string().min(1),
+});
+export type ArtifactProcessingSummary = z.infer<typeof artifactProcessingSummarySchema>;
+
 export const caseExtractionResultSchema = z.object({
   id: z.string().min(1),
   caseId: z.string().min(1),
@@ -252,6 +266,11 @@ export const exportReadinessSummarySchema = z.object({
 export type ExportReadinessSummary = z.infer<typeof exportReadinessSummarySchema>;
 
 export const caseListItemSchema = caseSummarySchema.extend({
+  stage: z.enum(caseStatuses).optional(),
+  manualActionRequired: z.boolean().optional(),
+  recommendedAction: nullableStringSchema.optional(),
+  needsMyAction: z.boolean().optional(),
+  artifactSummary: artifactProcessingSummarySchema.optional(),
   artifacts: z
     .array(
       caseArtifactSchema.pick({
@@ -268,6 +287,7 @@ export type CaseListResponse = z.infer<typeof caseListResponseSchema>;
 export const caseDetailResponseSchema = caseSummarySchema.extend({
   stage: z.enum(caseStatuses),
   manualActionRequired: z.boolean(),
+  artifactSummary: artifactProcessingSummarySchema,
   latestExtraction: caseExtractionResultSchema.nullable(),
   latestPolicyResult: casePolicyResultSchema.nullable(),
   latestApprovalTask: caseApprovalTaskSchema.nullable(),

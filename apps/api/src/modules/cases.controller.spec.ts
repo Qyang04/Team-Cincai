@@ -59,6 +59,7 @@ function createCasesControllerHarness(options?: {
           },
     listCases: async () => [],
     createCase: async () => undefined,
+    assignCaseOwner: async () => undefined,
     getTransitions: async () => [],
   };
 
@@ -69,6 +70,7 @@ function createCasesControllerHarness(options?: {
         : {
             id: "task-1",
             caseId: "case-1",
+            approverId: "manager.approver",
             status: "INFO_REQUESTED",
           },
     reopenTask: async (taskId: string) => {
@@ -246,6 +248,7 @@ test("CasesController reopens the latest info-requested approval task before ret
       actorType: "REQUESTER",
       actorId: "demo.requester",
       note: "Requester answered approver follow-up questions.",
+      assignedTo: "manager.approver",
     },
   ]);
   assert.equal(harness.auditEvents.length, 1);
@@ -310,6 +313,7 @@ test("CasesController reruns policy routing when requester answers the final fin
       actorType: "REQUESTER",
       actorId: "demo.requester",
       note: "Requester completed outstanding clarification questions.",
+      assignedTo: "demo.requester",
     },
   ]);
   assert.deepEqual(harness.runPolicyCalls, ["case-1"]);
@@ -344,6 +348,7 @@ test("CasesController send-back keeps finance review visible as a requester clar
       actorType: "FINANCE_REVIEWER",
       actorId: "configured.finance",
       note: "Please attach the settled amount evidence.",
+      assignedTo: "demo.requester",
     },
   ]);
   assert.deepEqual(harness.createdQuestions, [
@@ -388,6 +393,7 @@ test("CasesController wraps approval success in the shared action envelope", asy
     approvalTask: {
       id: "task-1",
       caseId: "case-1",
+      stageNumber: 1,
     },
   });
 

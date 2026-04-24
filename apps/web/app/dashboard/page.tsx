@@ -1,6 +1,6 @@
 import { DEFAULT_API_BASE_URL, caseListResponseSchema, type CaseListItem } from "@finance-ops/shared";
 import Link from "next/link";
-import { getServerAuthHeaders } from "../lib/session";
+import { getServerAuthHeaders, getServerSession } from "../lib/session";
 import { fetchApiJson } from "../lib/server-api";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
@@ -49,6 +49,7 @@ function formatRelative(dateString: string): string {
 }
 
 export default async function DashboardPage() {
+  const session = await getServerSession();
   const { cases, isLive, errorMessage } = await getCases();
   const openCases = cases.filter((item) => item.status !== "CLOSED").length;
   const awaitingApproval = cases.filter(
@@ -70,14 +71,25 @@ export default async function DashboardPage() {
       return accumulator;
     }, {}),
   ).sort((left, right) => right[1] - left[1]);
+  const myActionCases = cases.filter((item) => item.needsMyAction);
+  const ownedCases = session ? cases.filter((item) => item.assignedTo === session.user.id) : [];
+  const intakeCases = cases.filter((item) =>
+    item.status === "DRAFT" ||
+    item.status === "SUBMITTED" ||
+    item.status === "INTAKE_PROCESSING" ||
+    item.status === "AWAITING_REQUESTER_INFO" ||
+    item.status === "POLICY_REVIEW" ||
+    item.status === "AWAITING_APPROVER_INFO_RESPONSE",
+  );
+
   const metrics = isLive
     ? [
         { label: "Open cases", value: String(openCases), tone: "metric-neutral", note: "All non-closed cases" },
         {
-          label: "Awaiting approval",
-          value: String(awaitingApproval),
-          tone: awaitingApproval > 0 ? "metric-attention" : "metric-neutral",
-          note: "Approval queue plus approver follow-up states",
+          label: "Needs my action",
+          value: String(myActionCases.length),
+          tone: myActionCases.length > 0 ? "metric-attention" : "metric-neutral",
+          note: "Cases currently waiting on your lane",
         },
         {
           label: "Finance review",
@@ -120,9 +132,15 @@ export default async function DashboardPage() {
           <span className="kicker">Operational dashboard</span>
           <h1>Dashboard</h1>
           <p className="section-copy">
-            Monitor the current case list, queue counts, and workflow states exposed by the API. This page avoids
-            invented analytics and focuses on operator-visible status.
+            Monitor the current case list, queue counts, and workflow states exposed by the API. This page now doubles
+            as an inbox for active claim and case management work.
           </p>
+          {session ? (
+            <p className="muted">
+              Signed in as <strong>{session.user.displayName}</strong>. This view is scoped to the cases your current
+              role can access.
+            </p>
+          ) : null}
         </div>
         <div className="split-actions">
           <span className={`inline-status${isLive ? " inline-status-success" : ""}`}>
@@ -165,6 +183,69 @@ export default async function DashboardPage() {
             Open finance review
           </Link>
         </div>
+      </section>
+
+      <section className="dashboard-grid">
+        <article className="surface">
+          <div className="surface-head">
+            <div>
+              <p className="eyebrow">Needs attention</p>
+              <h2>My next actions</h2>
+            </div>
+            <span className="inline-status">{myActionCases.length}</span>
+          </div>
+          <div className="signal-list">
+            {myActionCases.length ? (
+              myActionCases.slice(0, 5).map((item) => (
+                <div key={item.id} className="signal-item">
+                  <div className="split-line">
+                    <strong>{item.id}</strong>
+                    <span>{humanizeValue(item.status)}</span>
+                  </div>
+                  <p className="muted">
+                    {item.recommendedAction ? humanizeValue(item.recommendedAction) : "Review this case"} |{" "}
+                    {item.artifactSummary?.summary ?? "No evidence summary"}
+                  </p>
+                  <Link href={`/cases/${item.id}`}>Open case</Link>
+                </div>
+              ))
+            ) : (
+              <div className="signal-item">
+                <strong>No immediate actions</strong>
+                <p className="muted">Nothing in your visible workload is waiting on you right now.</p>
+              </div>
+            )}
+          </div>
+        </article>
+
+        <article className="surface">
+          <div className="surface-head">
+            <div>
+              <p className="eyebrow">Ownership</p>
+              <h2>Cases assigned to me</h2>
+            </div>
+            <span className="inline-status">{ownedCases.length}</span>
+          </div>
+          <div className="signal-list">
+            {ownedCases.length ? (
+              ownedCases.slice(0, 5).map((item) => (
+                <div key={item.id} className="signal-item">
+                  <div className="split-line">
+                    <strong>{humanizeValue(item.workflowType)}</strong>
+                    <span>{humanizeValue(item.status)}</span>
+                  </div>
+                  <p className="muted">{item.artifactSummary?.summary ?? "No evidence summary available."}</p>
+                  <Link href={`/cases/${item.id}`}>Inspect case</Link>
+                </div>
+              ))
+            ) : (
+              <div className="signal-item">
+                <strong>No owned cases</strong>
+                <p className="muted">Assignments will appear here as work moves through the workflow.</p>
+              </div>
+            )}
+          </div>
+        </article>
       </section>
 
       <section className="dashboard-grid">
@@ -224,6 +305,47 @@ export default async function DashboardPage() {
       <section className="surface">
         <div className="surface-head">
           <div>
+            <p className="eyebrow">Intake lane</p>
+            <h2>Cases still in claim and case management</h2>
+          </div>
+          <span className="inline-status">{intakeCases.length}</span>
+        </div>
+        <div className="data-list">
+          <div className="data-row data-row-head">
+            <span>Case</span>
+            <span>Owner</span>
+            <span>Status</span>
+            <span>Evidence</span>
+            <span>Action</span>
+          </div>
+          {intakeCases.length ? (
+            intakeCases.slice(0, 6).map((item) => (
+              <div key={item.id} className="data-row" style={{ gridTemplateColumns: "1.1fr 1fr 0.9fr 1.2fr auto" }}>
+                <div>
+                  <strong>{item.id}</strong>
+                  <p className="muted">{humanizeValue(item.workflowType)}</p>
+                </div>
+                <span>{item.assignedTo ?? "Unassigned"}</span>
+                <span className="inline-status">{humanizeValue(item.status)}</span>
+                <span>{item.artifactSummary?.summary ?? "No evidence"}</span>
+                <Link href={`/cases/${item.id}`}>{item.needsMyAction ? "Act now" : "View"}</Link>
+              </div>
+            ))
+          ) : (
+            <div className="empty-state">
+              <div>
+                <p className="eyebrow">Intake lane</p>
+                <h2>No intake-stage cases visible</h2>
+                <p className="muted">New drafts, clarification loops, and policy-ready cases will appear here.</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="surface">
+        <div className="surface-head">
+          <div>
             <p className="eyebrow">Recent cases</p>
             <h2>Latest case records</h2>
           </div>
@@ -232,7 +354,7 @@ export default async function DashboardPage() {
         <div className="data-list">
           <div className="data-row data-row-head">
             <span>Case / workflow</span>
-            <span>Requester</span>
+            <span>Owner</span>
             <span>Opened</span>
             <span>Status</span>
             <span>Artifacts</span>
@@ -248,10 +370,13 @@ export default async function DashboardPage() {
                   <strong>{item.id}</strong>
                   <p className="muted">{humanizeValue(item.workflowType)}</p>
                 </div>
-                <span>{item.requesterId}</span>
+                <span>{item.assignedTo ?? item.requesterId}</span>
                 <span>{formatRelative(item.createdAt)}</span>
                 <span className="inline-status">{humanizeValue(item.status)}</span>
-                <Link href={`/cases/${item.id}`}>{item.artifacts?.length ?? 0} file{item.artifacts?.length === 1 ? "" : "s"}</Link>
+                <Link href={`/cases/${item.id}`}>
+                  {item.artifactSummary?.total ?? item.artifacts?.length ?? 0} file
+                  {(item.artifactSummary?.total ?? item.artifacts?.length ?? 0) === 1 ? "" : "s"}
+                </Link>
               </div>
             ))
           ) : (

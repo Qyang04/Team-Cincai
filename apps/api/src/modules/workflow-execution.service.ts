@@ -77,6 +77,7 @@ export class WorkflowExecutionService implements OnModuleInit {
         to: "FINANCE_REVIEW",
         actorType: "SYSTEM",
         note: "Policy evaluation routed case to finance review.",
+        assignedTo: routingConfig.financeReviewerId,
       });
 
       await this.financeReviewService.enqueue(
@@ -94,14 +95,6 @@ export class WorkflowExecutionService implements OnModuleInit {
       return { case: updated, policyResult };
     }
 
-    const updated = await this.workflowService.transitionCase({
-      caseId: payload.caseId,
-      from: "POLICY_REVIEW",
-      to: "AWAITING_APPROVAL",
-      actorType: "SYSTEM",
-      note: "Policy evaluation routed case to manager approval.",
-    });
-
     const approvalTasks = await this.approvalsService.createMatrixTasks({
       caseId: payload.caseId,
       workflowType: caseRecord.workflowType,
@@ -111,6 +104,14 @@ export class WorkflowExecutionService implements OnModuleInit {
       managerApprovalThreshold: (await this.adminConfigService.getPolicyConfig()).managerApprovalThreshold,
     });
     const recipients = [...new Set(approvalTasks.filter((task) => task.status === "PENDING").map((task) => task.approverId))];
+    const updated = await this.workflowService.transitionCase({
+      caseId: payload.caseId,
+      from: "POLICY_REVIEW",
+      to: "AWAITING_APPROVAL",
+      actorType: "SYSTEM",
+      note: "Policy evaluation routed case to manager approval.",
+      assignedTo: recipients[0] ?? null,
+    });
     for (const recipientId of recipients) {
       await this.notificationsService.send({
         type: "approval-required",
@@ -139,6 +140,7 @@ export class WorkflowExecutionService implements OnModuleInit {
       to: "EXPORTING",
       actorType: "SYSTEM",
       note: "Started export processing.",
+      assignedTo: null,
     });
 
     const exportRecord = await this.exportsService.process(payload.caseId);
@@ -150,6 +152,7 @@ export class WorkflowExecutionService implements OnModuleInit {
         to: "RECOVERABLE_EXCEPTION",
         actorType: "SYSTEM",
         note: exportRecord.errorMessage ?? "Export failed.",
+        assignedTo: null,
       });
       return { case: failed, exportRecord };
     }
@@ -160,6 +163,7 @@ export class WorkflowExecutionService implements OnModuleInit {
       to: "EXPORTED",
       actorType: "SYSTEM",
       note: "Export completed successfully.",
+      assignedTo: null,
     });
     const closed = await this.workflowService.transitionCase({
       caseId: payload.caseId,
@@ -167,6 +171,7 @@ export class WorkflowExecutionService implements OnModuleInit {
       to: "CLOSED",
       actorType: "SYSTEM",
       note: "Case closed after successful export.",
+      assignedTo: null,
     });
 
     return { case: closed, exportRecord };

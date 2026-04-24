@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import {
   caseDetailResponseSchema,
+  type ArtifactProcessingSummary,
   type CaseDetailResponse,
 } from "@finance-ops/shared";
 import { PrismaService } from "./prisma.service";
@@ -30,6 +31,7 @@ type ExportRecordLike = {
 
 type ArtifactLike = {
   processingStatus?: string | null;
+  createdAt?: Date | string;
 };
 
 function toIsoDateTimeString(value: Date | string): string {
@@ -182,6 +184,51 @@ function getExportReadinessSummary(status: string, latestExportRecord: ExportRec
   }
 }
 
+function summarizeArtifacts(artifacts: ArtifactLike[]): ArtifactProcessingSummary {
+  const counts = {
+    total: artifacts.length,
+    prepared: 0,
+    uploaded: 0,
+    processing: 0,
+    processed: 0,
+    failed: 0,
+  };
+
+  for (const artifact of artifacts) {
+    const key = artifact.processingStatus?.toLowerCase();
+    if (key && key in counts) {
+      counts[key as keyof typeof counts] += 1;
+    }
+  }
+
+  const latest = [...artifacts].sort(
+    (left, right) => new Date(right.createdAt ?? 0).getTime() - new Date(left.createdAt ?? 0).getTime(),
+  )[0];
+  const latestStatus = latest?.processingStatus ?? null;
+  const allProcessed = counts.total > 0 && counts.processed === counts.total;
+  const hasFailures = counts.failed > 0;
+
+  let summary = "No artifacts attached yet.";
+  if (counts.total > 0) {
+    if (hasFailures) {
+      summary = `${counts.failed} artifact${counts.failed === 1 ? "" : "s"} failed processing.`;
+    } else if (counts.prepared + counts.uploaded + counts.processing > 0) {
+      const pending = counts.prepared + counts.uploaded + counts.processing;
+      summary = `${pending} artifact${pending === 1 ? "" : "s"} still processing.`;
+    } else if (allProcessed) {
+      summary = `${counts.processed} artifact${counts.processed === 1 ? "" : "s"} processed successfully.`;
+    }
+  }
+
+  return {
+    ...counts,
+    latestStatus,
+    allProcessed,
+    hasFailures,
+    summary,
+  };
+}
+
 @Injectable()
 export class CaseDetailService {
   constructor(private readonly prisma: PrismaService) {}
@@ -227,6 +274,7 @@ export class CaseDetailService {
       caseDetail.status,
       latestExportRecord as ExportRecordLike | null,
     );
+    const artifactSummary = summarizeArtifacts(caseDetail.artifacts as ArtifactLike[]);
 
     return caseDetailResponseSchema.parse({
       id: caseDetail.id,
@@ -239,6 +287,7 @@ export class CaseDetailService {
       updatedAt: toIsoDateTimeString(caseDetail.updatedAt),
       stage: caseDetail.status,
       manualActionRequired: manualActionStatuses.has(caseDetail.status),
+      artifactSummary,
       latestExtraction: latestExtraction
         ? {
             id: latestExtraction.id,

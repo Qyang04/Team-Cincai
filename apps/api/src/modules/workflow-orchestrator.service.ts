@@ -96,6 +96,7 @@ export class WorkflowOrchestratorService {
       actorType: actor.actorType,
       actorId: actor.actorId,
       note: "Manual recovery triggered from recoverable exception.",
+      assignedTo: actor.actorId,
     });
 
     return this.runPolicyAndRoute(caseId);
@@ -143,6 +144,7 @@ export class WorkflowOrchestratorService {
       actorType: "REQUESTER",
       actorId: existing.requesterId,
       note: "Requester submitted the draft case.",
+      assignedTo: existing.requesterId,
     });
 
     await this.workflowService.transitionCase({
@@ -151,6 +153,7 @@ export class WorkflowOrchestratorService {
       to: "INTAKE_PROCESSING",
       actorType: "SYSTEM",
       note: "System queued intake processing.",
+      assignedTo: existing.requesterId,
     });
 
     const aiResult = await this.jobRunner.dispatch<
@@ -173,6 +176,7 @@ export class WorkflowOrchestratorService {
       to: aiResult.decision.nextState,
       actorType: "SYSTEM",
       note: aiResult.decision.reasoningSummary,
+      assignedTo: existing.requesterId,
     });
 
     await this.auditService.recordEvent({

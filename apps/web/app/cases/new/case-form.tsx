@@ -26,7 +26,7 @@ type SubmissionState =
   | { kind: "success"; data: CaseSubmissionResponse }
   | { kind: "error"; error: string };
 
-const defaultFilenames = ["lunch-receipt.jpg", "parking-receipt.jpg"];
+const defaultFilenames: string[] = [];
 
 function fileKey(file: File): string {
   return `${file.name}:${file.size}:${file.lastModified}`;
@@ -58,6 +58,7 @@ export function CaseForm() {
   const [state, setState] = useState<SubmissionState>({ kind: "idle" });
   const [filenames, setFilenames] = useState<string[]>(defaultFilenames);
   const [stagedFiles, setStagedFiles] = useState<File[]>([]);
+  const [useMockArtifacts, setUseMockArtifacts] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isPending, startTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -120,13 +121,13 @@ export function CaseForm() {
 
     const workflowType = String(formData.get("workflowType") ?? "EXPENSE_CLAIM");
     const notes = String(formData.get("notes") ?? "");
-    const submittedFilenames = filenames.map((name) => name.trim()).filter(Boolean);
+    const submittedFilenames = useMockArtifacts ? filenames.map((name) => name.trim()).filter(Boolean) : [];
     const filesToUpload = [...stagedFiles];
 
     startTransition(async () => {
       try {
         if (!filesToUpload.length && !submittedFilenames.length) {
-          throw new Error("Add at least one file to upload, or enter mock artifact filenames (one per line).");
+          throw new Error("Add at least one real file to upload, or explicitly switch to mock artifact mode.");
         }
 
         const createResponse = await fetch(`${apiBaseUrl}/cases`, {
@@ -231,7 +232,7 @@ export function CaseForm() {
             <p className="muted">
               Click, drag and drop, or paste (Ctrl+V) real files. Each file is uploaded to the API and stored under{" "}
               <code>.local-artifacts/</code> on the server (see <code>LOCAL_ARTIFACT_DIR</code>). If you do not add
-              files, you can still use mock-only mode with the filename list below.
+              files, you can still switch to mock-only mode below for seeded demo scenarios.
             </p>
           </div>
           <input
@@ -286,36 +287,50 @@ export function CaseForm() {
           </div>
         ) : null}
 
-        {!stagedFiles.length && filenames.length ? (
+        {!stagedFiles.length ? (
           <div className="stack-list" style={{ gap: 8 }}>
-            <p className="detail-label">Mock artifact names (no binary upload)</p>
-            <div className="split-actions" style={{ flexWrap: "wrap", gap: 8, justifyContent: "flex-start" }}>
-              {filenames.map((name) => (
-                <span
-                  key={name}
-                  className="inline-status"
-                  style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-                >
-                  <code>{name}</code>
-                  <button
-                    type="button"
-                    aria-label={`Remove ${name}`}
-                    onClick={() => removeFilename(name)}
-                    suppressHydrationWarning
-                    style={{
-                      border: "none",
-                      background: "transparent",
-                      cursor: "pointer",
-                      fontSize: "1rem",
-                      lineHeight: 1,
-                      padding: 0,
-                    }}
+            <label
+              className="inline-status"
+              style={{ display: "inline-flex", alignItems: "center", gap: 8, width: "fit-content" }}
+            >
+              <input
+                type="checkbox"
+                checked={useMockArtifacts}
+                onChange={(event) => setUseMockArtifacts(event.target.checked)}
+                suppressHydrationWarning
+              />
+              Use mock artifact mode instead of uploading real files
+            </label>
+
+            {useMockArtifacts && filenames.length ? (
+              <div className="split-actions" style={{ flexWrap: "wrap", gap: 8, justifyContent: "flex-start" }}>
+                {filenames.map((name) => (
+                  <span
+                    key={name}
+                    className="inline-status"
+                    style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
                   >
-                    x
-                  </button>
-                </span>
-              ))}
-            </div>
+                    <code>{name}</code>
+                    <button
+                      type="button"
+                      aria-label={`Remove ${name}`}
+                      onClick={() => removeFilename(name)}
+                      suppressHydrationWarning
+                      style={{
+                        border: "none",
+                        background: "transparent",
+                        cursor: "pointer",
+                        fontSize: "1rem",
+                        lineHeight: 1,
+                        padding: 0,
+                      }}
+                    >
+                      x
+                    </button>
+                  </span>
+                ))}
+              </div>
+            ) : null}
           </div>
         ) : null}
 
@@ -349,7 +364,7 @@ export function CaseForm() {
         </label>
 
         <label className="field">
-          <span className="field-label">Mock-only filenames (one per line, when no files staged)</span>
+          <span className="field-label">Mock-only filenames (one per line)</span>
           <textarea
             rows={4}
             value={filenames.join("\n")}
@@ -362,8 +377,8 @@ export function CaseForm() {
               )
             }
             className="field-control field-control-mono"
-            placeholder="Used only if you submit without staging files above"
-            disabled={stagedFiles.length > 0}
+            placeholder="Used only when mock artifact mode is enabled above"
+            disabled={stagedFiles.length > 0 || !useMockArtifacts}
             suppressHydrationWarning
           />
         </label>
@@ -386,6 +401,7 @@ export function CaseForm() {
             setState({ kind: "idle" });
             setFilenames(defaultFilenames);
             setStagedFiles([]);
+            setUseMockArtifacts(false);
             router.refresh();
           }}
         >

@@ -309,15 +309,26 @@ export class CasesController {
   }
 
   @Post(":id/artifacts/upload-url")
-  prepareArtifactUpload(
+  async prepareArtifactUpload(
     @Param("id") id: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Body()
     body: {
       filename: string;
       mimeType?: string;
     },
   ) {
+    const caseRecord = await this.casesService.getCase(id);
     const input = prepareUploadSchema.parse(body);
+    if (!caseRecord) {
+      throw new NotFoundException("Case not found");
+    }
+    if (caseRecord.status !== "DRAFT") {
+      throw new BadRequestException("Artifacts can only be prepared while the case is in DRAFT.");
+    }
+    if (caseRecord.requesterId !== user.id && !user.roles.includes("ADMIN")) {
+      throw new ForbiddenException("Only the requester or an admin can prepare uploads for this case.");
+    }
     return this.storageService.prepareUpload({
       caseId: id,
       filename: input.filename,
@@ -326,14 +337,25 @@ export class CasesController {
   }
 
   @Post(":id/artifacts")
-  attachArtifacts(
+  async attachArtifacts(
     @Param("id") id: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Body()
     body: {
       filenames: string[];
       mimeType?: string;
     },
   ) {
+    const caseRecord = await this.casesService.getCase(id);
+    if (!caseRecord) {
+      throw new NotFoundException("Case not found");
+    }
+    if (caseRecord.status !== "DRAFT") {
+      throw new BadRequestException("Artifacts can only be attached while the case is in DRAFT.");
+    }
+    if (caseRecord.requesterId !== user.id && !user.roles.includes("ADMIN")) {
+      throw new ForbiddenException("Only the requester or an admin can attach artifacts for this case.");
+    }
     const input = attachArtifactsSchema.parse(body);
     return this.artifactsService.attachMany(id, input.filenames, {
       mimeType: input.mimeType,
@@ -343,26 +365,38 @@ export class CasesController {
   }
 
   @Post(":id/artifacts/:artifactId/complete")
-  completeArtifactUpload(
+  async completeArtifactUpload(
     @Param("id") id: string,
     @Param("artifactId") artifactId: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Body()
     body: {
       storageUri?: string;
     },
   ) {
+    const caseRecord = await this.casesService.getCase(id);
+    if (!caseRecord) {
+      throw new NotFoundException("Case not found");
+    }
+    if (caseRecord.requesterId !== user.id && !user.roles.includes("ADMIN")) {
+      throw new ForbiddenException("Only the requester or an admin can complete artifact uploads for this case.");
+    }
     const input = completeArtifactUploadSchema.parse(body);
     return this.workflowOrchestrator.processArtifactUpload(id, artifactId, input.storageUri);
   }
 
   @Post(":id/artifacts/process")
-  processArtifact(
+  async processArtifact(
     @Param("id") id: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Body()
     body: {
       artifactId: string;
     },
   ) {
+    if (!(await this.authorizationService.canViewCase(user, id))) {
+      throw new ForbiddenException("You do not have access to this case.");
+    }
     const input = processArtifactSchema.parse(body);
     return this.workflowOrchestrator.processArtifactUpload(id, input.artifactId);
   }
@@ -422,6 +456,7 @@ export class CasesController {
         actorType: "REQUESTER",
         actorId: caseRecord.requesterId,
         note: "Requester completed outstanding clarification questions.",
+        assignedTo: caseRecord.requesterId,
       });
 
       await this.workflowOrchestrator.runPolicyAndRoute(id);
@@ -456,6 +491,7 @@ export class CasesController {
         actorType: "REQUESTER",
         actorId: caseRecord.requesterId,
         note: "Requester answered approver follow-up questions.",
+        assignedTo: approvalTask.approverId,
       });
     }
 
@@ -582,6 +618,7 @@ export class CasesController {
       actorType: "APPROVER",
       actorId: input.approverId,
       note: input.decisionReason ?? "Final matrix stage approved by approver.",
+      assignedTo: null,
     });
     const exportReadyCase = await this.workflowService.transitionCase({
       caseId: task.caseId,
@@ -589,6 +626,7 @@ export class CasesController {
       to: "EXPORT_READY",
       actorType: "SYSTEM",
       note: "Case marked ready for export after matrix completion.",
+      assignedTo: null,
     });
     const exportRecord = await this.exportsService.ensureExportReady(task.caseId);
 
@@ -629,6 +667,7 @@ export class CasesController {
       actorType: "APPROVER",
       actorId: input.approverId,
       note: input.decisionReason ?? "Rejected by assigned approver.",
+      assignedTo: null,
     });
 
     return {
@@ -668,6 +707,7 @@ export class CasesController {
       actorType: "APPROVER",
       actorId: input.approverId,
       note: input.question,
+      assignedTo: task.case.requesterId,
     });
 
     await this.intakeService.createQuestion(task.caseId, input.question, "APPROVER_REQUEST");
@@ -720,6 +760,7 @@ export class CasesController {
         reason: input.reason ?? null,
       },
     });
+    await this.casesService.assignCaseOwner(task.caseId, input.delegateTo);
 
     const caseRecord = await this.casesService.getCase(task.caseId);
 
@@ -790,6 +831,7 @@ export class CasesController {
       actorType: "FINANCE_REVIEWER",
       actorId: input.reviewerId,
       note: input.note ?? "Approved by finance reviewer.",
+      assignedTo: null,
     });
     const exportReady = await this.workflowService.transitionCase({
       caseId: review.caseId,
@@ -797,6 +839,7 @@ export class CasesController {
       to: "EXPORT_READY",
       actorType: "SYSTEM",
       note: "Case marked export-ready after finance approval.",
+      assignedTo: null,
     });
     const exportRecord = await this.exportsService.ensureExportReady(review.caseId);
     return {
@@ -853,6 +896,7 @@ export class CasesController {
       actorType: "FINANCE_REVIEWER",
       actorId: input.reviewerId,
       note: input.note ?? "Rejected by finance reviewer.",
+      assignedTo: null,
     });
     return {
       success: true,
@@ -907,6 +951,7 @@ export class CasesController {
       actorType: "FINANCE_REVIEWER",
       actorId: input.reviewerId,
       note: input.note ?? "Finance reviewer requested more information.",
+      assignedTo: (await this.casesService.getCase(review.caseId))?.requesterId ?? null,
     });
     await this.intakeService.createQuestion(review.caseId, input.note ?? "Please provide more supporting information.", "FINANCE_REVIEW");
     return {
@@ -932,6 +977,7 @@ export class CasesController {
       );
     }
     const review = await this.financeReviewService.assignOwner(reviewId, input.ownerId);
+    await this.casesService.assignCaseOwner(review.caseId, input.ownerId);
     await this.auditService.recordEvent({
       caseId: review.caseId,
       eventType: "FINANCE_REVIEW_ASSIGNED",

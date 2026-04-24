@@ -24,6 +24,7 @@ export class WorkflowService {
     actorType: ActorType;
     actorId?: string;
     note?: string;
+    assignedTo?: string | null;
   }) {
     this.assertTransition(input.from, input.to);
     this.telemetry.increment(`workflow.transition.${input.from}.${input.to}`);
@@ -49,7 +50,10 @@ export class WorkflowService {
           id: input.caseId,
           status: input.from,
         },
-        data: { status: input.to },
+        data: {
+          status: input.to,
+          assignedTo: input.assignedTo === undefined ? undefined : input.assignedTo,
+        },
       });
 
       if (updateResult.count !== 1) {
