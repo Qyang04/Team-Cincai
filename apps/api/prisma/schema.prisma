@@ -62,11 +62,44 @@ model Case {
   extractionResults   ExtractionResult[]
   openQuestions       OpenQuestion[]
   policyResults       PolicyResult[]
+  approvalMatrix      ApprovalMatrix?
   approvalTasks       ApprovalTask[]
   financeReviews      FinanceReview[]
   exportRecords       ExportRecord[]
   workflowTransitions WorkflowTransition[]
   auditEvents         AuditEvent[]
+}
+
+model ApprovalMatrix {
+  id            String          @id @default(uuid())
+  caseId         String          @unique
+  status         String          @default("ACTIVE")
+  routingReason  String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  case           Case            @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  stages         ApprovalStage[]
+}
+
+model ApprovalStage {
+  id               String         @id @default(uuid())
+  matrixId         String
+  stageNumber      Int
+  mode             String         @default("SEQUENTIAL")
+  dependencyType   String         @default("ALL_REQUIRED")
+  label            String?
+  status           String         @default("BLOCKED")
+  requiredApprovals Int           @default(1)
+  slaHours         Int?
+  dueAt            DateTime?
+  escalatesTo      String?
+  escalatedAt      DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  matrix           ApprovalMatrix @relation(fields: [matrixId], references: [id], onDelete: Cascade)
+  tasks            ApprovalTask[]
+
+  @@unique([matrixId, stageNumber])
 }
 
 model Artifact {
@@ -147,7 +180,13 @@ model PolicyResult {
 model ApprovalTask {
   id            String   @id @default(uuid())
   caseId         String
+  stageId        String?
   approverId     String
+  stageNumber    Int      @default(1)
+  stageMode      String   @default("SEQUENTIAL")
+  stageLabel     String?
+  delegatedFrom  String?
+  actingApproverId String?
   status         String   @default("PENDING")
   decision       String?
   decisionReason String?
@@ -155,6 +194,7 @@ model ApprovalTask {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   case           Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  stage          ApprovalStage? @relation(fields: [stageId], references: [id], onDelete: SetNull)
 }
 
 model FinanceReview {

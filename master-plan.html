@@ -780,7 +780,7 @@
           <div class="arch-box teal">
             <span class="label">Frontend</span>
             <h3>Next.js Web App</h3>
-            <p>Requester, approver, finance review, and admin surfaces. Next evolution: stage visibility, approval matrix visibility, and exception ownership.</p>
+            <p>Requester, approver, finance review, and admin surfaces. Next evolution: matrix graph depth across queue/case views and stronger exception ownership.</p>
           </div>
           <div class="arch-box violet">
             <span class="label">Reasoning</span>
@@ -1025,13 +1025,13 @@ stateDiagram-v2
         </div>
         <p>
           This is the execution-facing view: <strong>in the repo today</strong> versus <strong>not done yet</strong>, aligned with
-          <code>master-plan-repo-status-and-execution-guide.md</code> (inspection snapshot 2026-04-23). The rest of this HTML page describes the target architecture; this section tracks delivery reality.
+          <code>master-plan-repo-status-and-execution-guide.md</code> (inspection snapshot 2026-04-24). The rest of this HTML page describes the target architecture; this section tracks delivery reality.
         </p>
       </div>
 
       <p class="status-intro">
         The codebase has a strong workflow backbone (states, transitions, case detail, approvals, finance review, export, recoverable exceptions, mock-first seams).
-        The largest gap is <strong>finance depth</strong>: multi-tier approvals, FX and tax behavior, richer duplicate signals, evidence-driven extraction, and production-grade auth and connectors.
+        The largest gap is <strong>finance depth</strong>: FX and tax behavior, richer duplicate signals, evidence-driven extraction, and production-grade auth and connectors.
       </p>
 
       <div class="status-area">
@@ -1106,16 +1106,27 @@ stateDiagram-v2
           <div class="status-col done">
             <h4>In the repo today</h4>
             <ul class="status-list">
-              <li>Approval queue; approve, reject, request-info; reopen after requester answers.</li>
-              <li>Routing-configured default approver; single-step approval for the MVP path.</li>
+              <li>Approval queue plus approve, reject, request-info, and reopen loops are operational.</li>
+              <li>First-class matrix persistence exists (`ApprovalMatrix` + `ApprovalStage`) with task linkage.</li>
+              <li>Matrix stage semantics are implemented: dependency type and quorum (`ALL_REQUIRED`, `ANY_ONE`, `MIN_N`).</li>
+              <li>Stage-level SLA and escalation metadata are persisted (`slaHours`, `dueAt`, `escalatesTo`, `escalatedAt`).</li>
+              <li>Conditional tiers now route by workflow, threshold, department, and cost center.</li>
+              <li>Manual delegation and admin-configured out-of-office auto-delegation are both implemented.</li>
+              <li>Admin delegation UX is a structured rule editor (CRUD-like controls, datetime validation path, active rule preview).</li>
+              <li>Queue cards show stage context and delegation status (including auto-OOO vs manual delegation badges).</li>
+              <li>Case detail now includes matrix timeline visualization with stage progress, member status, quorum context, and blockers.</li>
+              <li>SLA sweep now runs on a schedule, with auto-escalation and reminder notifications for overdue stages.</li>
+              <li>SLA reminder cooldown state is persisted so reminder behavior survives service restarts.</li>
+              <li>Admin-managed matrix template authoring is live for stages, dependency type, quorum, SLA, escalation, and routing conditions.</li>
+              <li>Queue and case surfaces now include dependency-aware blocker drill-down links between stages.</li>
+              <li>Approval analytics are exposed and shown (throughput, bottleneck stage, delegation and escalation impact).</li>
             </ul>
           </div>
           <div class="status-col todo">
             <h4>Not done yet</h4>
             <ul class="status-list">
-              <li>Approval matrix persistence and multi-task patterns.</li>
-              <li>Sequential, parallel, and conditional tiers; delegation and substitutes.</li>
-              <li>Matrix-level UI (pending vs completed, stage progress).</li>
+              <li>Optional polish: render a fully node-edge graph view in addition to stage cards and timelines.</li>
+              <li>Optional polish: add historical trend charts for approval analytics (not just current summary metrics).</li>
             </ul>
           </div>
         </div>
@@ -1160,7 +1171,7 @@ stateDiagram-v2
               <li><strong>Export:</strong> normalized accounting payload spec, handoff history, retry metadata, operational analytics.</li>
               <li><strong>Admin:</strong> matrix config, workflow-specific policy editing, FX or tax policy, connector credentials and change history.</li>
               <li><strong>Auth:</strong> real sign-in and session UX, org and manager mapping, approver identity beyond defaults.</li>
-              <li><strong>Contracts or DB:</strong> stage and matrix contracts, reconciliation and anomaly persistence, assignment fields.</li>
+              <li><strong>Contracts or DB:</strong> reconciliation and anomaly persistence, assignment fields.</li>
               <li><strong>Web or integrations or tests:</strong> inbox filtering and assignment, matrix or finance UI depth, real OCR or notifications or export or directory, web and integration tests and seeded demo verification.</li>
             </ul>
           </div>
@@ -1242,7 +1253,7 @@ stateDiagram-v2
       <div class="roadmap">
         <div class="phase"><strong>Phase 1</strong><p>Stabilize the current prototype: fix build issues, align API and web behavior, confirm documented state transitions.</p></div>
         <div class="phase"><strong>Phase 2</strong><p>Formalize Harness runtime metadata: stage, manual action required, reasoning summary, failure mode, and better view models.</p></div>
-        <div class="phase"><strong>Phase 3</strong><p>Deepen finance correctness: approval matrix contracts, FX reconciliation fields, tax normalization, and recoverable exception categories.</p></div>
+        <div class="phase"><strong>Phase 3</strong><p>Deepen finance correctness: matrix governance (templates, SLA escalation execution, analytics), FX reconciliation fields, tax normalization, and recoverable exception categories.</p></div>
         <div class="phase"><strong>Phase 4</strong><p>Polish the flagship expense-claim demo while keeping the shared engine broad enough for the other workflow types.</p></div>
       </div>
     </section>

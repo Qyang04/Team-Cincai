@@ -19,6 +19,11 @@ export const requestInfoSchema = z.object({
   question: z.string().min(1).max(2000),
 });
 
+export const delegateApprovalSchema = z.object({
+  delegateTo: z.string().min(1),
+  reason: z.string().max(2000).optional(),
+});
+
 export const financeDecisionSchema = z.object({
   reviewerId: z.string().min(1),
   note: z.string().max(2000).optional(),

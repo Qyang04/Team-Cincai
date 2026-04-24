@@ -14,7 +14,11 @@ test("ApprovalsService reopens an info-requested task as pending and clears prio
     },
   };
 
-  const service = new ApprovalsService(prisma as never);
+  const service = new ApprovalsService(
+    prisma as never,
+    { getDelegationConfig: async () => ({ rules: [] }) } as never,
+    { send: async () => ({ delivered: true }) } as never,
+  );
   await service.reopenTask("task-1");
 
   assert.deepEqual(updateInput, {
@@ -39,7 +43,11 @@ test("ApprovalsService fetches the latest approval task waiting for requester fo
     },
   };
 
-  const service = new ApprovalsService(prisma as never);
+  const service = new ApprovalsService(
+    prisma as never,
+    { getDelegationConfig: async () => ({ rules: [] }) } as never,
+    { send: async () => ({ delivered: true }) } as never,
+  );
   const task = await service.getLatestInfoRequestedTask("case-1");
 
   assert.equal(task?.id, "task-2");
@@ -65,13 +73,17 @@ test("ApprovalsService lists only pending tasks and includes case context for th
     },
   };
 
-  const service = new ApprovalsService(prisma as never);
+  const service = new ApprovalsService(
+    prisma as never,
+    { getDelegationConfig: async () => ({ rules: [] }) } as never,
+    { send: async () => ({ delivered: true }) } as never,
+  );
   await service.listPendingTasks();
 
   assert.deepEqual(findManyInput, {
     where: { status: "PENDING" },
     orderBy: { createdAt: "asc" },
-    include: { case: true },
+    include: { case: true, stage: true },
   });
 });
 
@@ -115,7 +127,11 @@ test("ApprovalsService makes a reopened task visible in the pending approval que
     },
   };
 
-  const service = new ApprovalsService(prisma as never);
+  const service = new ApprovalsService(
+    prisma as never,
+    { getDelegationConfig: async () => ({ rules: [] }) } as never,
+    { send: async () => ({ delivered: true }) } as never,
+  );
 
   await service.reopenTask("task-1");
   const pendingTasks = await service.listPendingTasks();
@@ -141,4 +157,97 @@ test("ApprovalsService makes a reopened task visible in the pending approval que
       updatedAt: "2026-04-22T08:00:00.000Z",
     },
   });
+});
+
+test("ApprovalsService escalates overdue stages with escalation targets", async () => {
+  const updatedTaskIds: string[] = [];
+  const notifications: string[] = [];
+  let updatedStageId: string | null = null;
+
+  const prisma = {
+    approvalStage: {
+      findMany: async () => [
+        {
+          id: "stage-1",
+          stageNumber: 2,
+          escalatesTo: "director.approver",
+          tasks: [{ id: "task-1", approverId: "manager.approver", status: "PENDING" }],
+          matrix: { caseId: "case-1", status: "ACTIVE" },
+        },
+      ],
+      update: async ({ where }: { where: { id: string } }) => {
+        updatedStageId = where.id;
+        return {};
+      },
+    },
+    approvalTask: {
+      update: async ({ where }: { where: { id: string } }) => {
+        updatedTaskIds.push(where.id);
+        return {};
+      },
+    },
+    adminSetting: {
+      findUnique: async () => null,
+      upsert: async () => ({}),
+    },
+  };
+
+  const service = new ApprovalsService(
+    prisma as never,
+    { getDelegationConfig: async () => ({ rules: [] }) } as never,
+    {
+      send: async ({ type }: { type: string }) => {
+        notifications.push(type);
+        return { delivered: true };
+      },
+    } as never,
+  );
+
+  const result = await service.runSlaBreachSweep();
+  assert.deepEqual(result, { escalatedStages: 1, escalatedTasks: 1, reminderCandidates: 0 });
+  assert.deepEqual(updatedTaskIds, ["task-1"]);
+  assert.equal(updatedStageId, "stage-1");
+  assert.deepEqual(notifications, ["APPROVAL_SLA_ESCALATED"]);
+});
+
+test("ApprovalsService sends reminders for overdue stages without escalation", async () => {
+  const notifications: string[] = [];
+  let reminderStateSaved = false;
+
+  const prisma = {
+    approvalStage: {
+      findMany: async () => [
+        {
+          id: "stage-r1",
+          stageNumber: 1,
+          escalatesTo: null,
+          tasks: [{ id: "task-r1", approverId: "manager.approver", status: "PENDING" }],
+          matrix: { caseId: "case-2", status: "ACTIVE" },
+        },
+      ],
+    },
+    adminSetting: {
+      findUnique: async () => ({ key: "approvalSlaReminderState", value: {} }),
+      upsert: async () => {
+        reminderStateSaved = true;
+        return {};
+      },
+    },
+  };
+
+  const service = new ApprovalsService(
+    prisma as never,
+    { getDelegationConfig: async () => ({ rules: [] }) } as never,
+    {
+      send: async ({ type }: { type: string }) => {
+        notifications.push(type);
+        return { delivered: true };
+      },
+    } as never,
+  );
+
+  const result = await service.runSlaBreachSweep();
+  assert.deepEqual(result, { escalatedStages: 0, escalatedTasks: 0, reminderCandidates: 1 });
+  assert.deepEqual(notifications, ["APPROVAL_SLA_REMINDER"]);
+  assert.equal(reminderStateSaved, true);
 });

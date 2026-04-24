@@ -194,7 +194,7 @@ export class CaseDetailService {
         extractionResults: { orderBy: { createdAt: "desc" }, take: 1 },
         openQuestions: { orderBy: { createdAt: "asc" } },
         policyResults: { orderBy: { createdAt: "desc" }, take: 1 },
-        approvalTasks: { orderBy: { createdAt: "desc" } },
+        approvalTasks: { orderBy: { createdAt: "desc" }, include: { stage: true } },
         financeReviews: { orderBy: { createdAt: "desc" } },
         exportRecords: { orderBy: { createdAt: "desc" }, take: 1 },
         workflowTransitions: { orderBy: { createdAt: "asc" } },
@@ -268,6 +268,29 @@ export class CaseDetailService {
             id: latestApprovalTask.id,
             caseId: latestApprovalTask.caseId,
             approverId: latestApprovalTask.approverId,
+            ...(latestApprovalTask.stageNumber !== undefined ? { stageNumber: latestApprovalTask.stageNumber } : {}),
+            ...(latestApprovalTask.stageMode ? { stageMode: latestApprovalTask.stageMode } : {}),
+            ...(latestApprovalTask.stageLabel ? { stageLabel: latestApprovalTask.stageLabel } : {}),
+            ...(latestApprovalTask.stage?.dependencyType
+              ? { stageDependencyType: latestApprovalTask.stage.dependencyType }
+              : {}),
+            ...(latestApprovalTask.stage?.requiredApprovals !== undefined
+              ? { stageRequiredApprovals: latestApprovalTask.stage.requiredApprovals }
+              : {}),
+            ...(latestApprovalTask.stage?.slaHours !== undefined
+              ? { stageSlaHours: latestApprovalTask.stage.slaHours }
+              : {}),
+            ...(latestApprovalTask.stage?.dueAt !== undefined
+              ? { stageDueAt: toNullableIsoDateTimeString(latestApprovalTask.stage.dueAt) }
+              : {}),
+            ...(latestApprovalTask.stage?.escalatesTo !== undefined
+              ? { stageEscalatesTo: latestApprovalTask.stage.escalatesTo }
+              : {}),
+            ...(latestApprovalTask.stage?.escalatedAt !== undefined
+              ? { stageEscalatedAt: toNullableIsoDateTimeString(latestApprovalTask.stage.escalatedAt) }
+              : {}),
+            ...(latestApprovalTask.delegatedFrom ? { delegatedFrom: latestApprovalTask.delegatedFrom } : {}),
+            ...(latestApprovalTask.actingApproverId ? { actingApproverId: latestApprovalTask.actingApproverId } : {}),
             status: latestApprovalTask.status,
             decision: latestApprovalTask.decision,
             decisionReason: latestApprovalTask.decisionReason,
@@ -352,6 +375,19 @@ export class CaseDetailService {
         id: task.id,
         caseId: task.caseId,
         approverId: task.approverId,
+        ...(task.stageNumber !== undefined ? { stageNumber: task.stageNumber } : {}),
+        ...(task.stageMode ? { stageMode: task.stageMode } : {}),
+        ...(task.stageLabel ? { stageLabel: task.stageLabel } : {}),
+        ...(task.stage?.dependencyType ? { stageDependencyType: task.stage.dependencyType } : {}),
+        ...(task.stage?.requiredApprovals !== undefined ? { stageRequiredApprovals: task.stage.requiredApprovals } : {}),
+        ...(task.stage?.slaHours !== undefined ? { stageSlaHours: task.stage.slaHours } : {}),
+        ...(task.stage?.dueAt !== undefined ? { stageDueAt: toNullableIsoDateTimeString(task.stage.dueAt) } : {}),
+        ...(task.stage?.escalatesTo !== undefined ? { stageEscalatesTo: task.stage.escalatesTo } : {}),
+        ...(task.stage?.escalatedAt !== undefined
+          ? { stageEscalatedAt: toNullableIsoDateTimeString(task.stage.escalatedAt) }
+          : {}),
+        ...(task.delegatedFrom ? { delegatedFrom: task.delegatedFrom } : {}),
+        ...(task.actingApproverId ? { actingApproverId: task.actingApproverId } : {}),
         status: task.status,
         decision: task.decision,
         decisionReason: task.decisionReason,

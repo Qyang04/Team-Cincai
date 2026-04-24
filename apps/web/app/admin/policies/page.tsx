@@ -1,8 +1,12 @@
 import {
+  adminApprovalMatrixConfigSchema,
   DEFAULT_API_BASE_URL,
+  adminDelegationConfigSchema,
   adminConnectorsResponseSchema,
   adminPolicyConfigSchema,
   adminRoutingConfigSchema,
+  type AdminApprovalMatrixConfig,
+  type AdminDelegationConfig,
   type AdminConnectorStatus,
   type AdminPolicyConfig,
   type AdminRoutingConfig,
@@ -36,15 +40,19 @@ const fallbackRouting: AdminRoutingConfig = {
 async function getAdminData(): Promise<{
   policy: AdminPolicyConfig;
   routing: AdminRoutingConfig;
+  delegation: AdminDelegationConfig;
+  approvalMatrix: AdminApprovalMatrixConfig;
   connectors: AdminConnectorStatus[];
   sourceState: {
     policy: boolean;
     routing: boolean;
+    delegation: boolean;
+    approvalMatrix: boolean;
     connectors: boolean;
   };
   errors: string[];
 }> {
-  const [policyResult, routingResult, connectorsResult] = await Promise.all([
+  const [policyResult, routingResult, connectorsResult, delegationResult, approvalMatrixResult] = await Promise.all([
     fetchApiJson<AdminPolicyConfig>({
       url: `${apiBaseUrl}/admin/policies`,
       init: { cache: "no-store", headers: adminHeaders },
@@ -66,19 +74,37 @@ async function getAdminData(): Promise<{
       resourceLabel: "Admin connector status",
       parse: (value) => adminConnectorsResponseSchema.parse(value),
     }),
+    fetchApiJson<AdminDelegationConfig>({
+      url: `${apiBaseUrl}/admin/delegations`,
+      init: { cache: "no-store", headers: adminHeaders },
+      fallbackData: { rules: [] },
+      resourceLabel: "Admin delegation settings",
+      parse: (value) => adminDelegationConfigSchema.parse(value),
+    }),
+    fetchApiJson<AdminApprovalMatrixConfig>({
+      url: `${apiBaseUrl}/admin/approval-matrix`,
+      init: { cache: "no-store", headers: adminHeaders },
+      fallbackData: { templates: [] },
+      resourceLabel: "Admin approval matrix settings",
+      parse: (value) => adminApprovalMatrixConfigSchema.parse(value),
+    }),
   ]);
 
-  const errors = [policyResult, routingResult, connectorsResult]
+  const errors = [policyResult, routingResult, delegationResult, approvalMatrixResult, connectorsResult]
     .filter((result) => !result.ok)
     .map((result) => result.message);
 
   return {
     policy: policyResult.data,
     routing: routingResult.data,
+    delegation: delegationResult.data,
+    approvalMatrix: approvalMatrixResult.data,
     connectors: connectorsResult.data,
     sourceState: {
       policy: policyResult.ok,
       routing: routingResult.ok,
+      delegation: delegationResult.ok,
+      approvalMatrix: approvalMatrixResult.ok,
       connectors: connectorsResult.ok,
     },
     errors,
@@ -87,7 +113,11 @@ async function getAdminData(): Promise<{
 
 export default async function AdminPoliciesPage() {
   const data = await getAdminData();
-  const showingFallback = !data.sourceState.policy || !data.sourceState.routing;
+  const showingFallback =
+    !data.sourceState.policy ||
+    !data.sourceState.routing ||
+    !data.sourceState.delegation ||
+    !data.sourceState.approvalMatrix;
 
   return (
     <div className="workspace workspace-tight fade-up">
@@ -129,7 +159,12 @@ export default async function AdminPoliciesPage() {
             </div>
           ) : null}
 
-          <PolicyAdminForm initialPolicy={data.policy} initialRouting={data.routing} />
+          <PolicyAdminForm
+            initialPolicy={data.policy}
+            initialRouting={data.routing}
+            initialDelegation={data.delegation}
+            initialApprovalMatrix={data.approvalMatrix}
+          />
 
           <section className="connector-grid">
             {data.connectors.length ? (

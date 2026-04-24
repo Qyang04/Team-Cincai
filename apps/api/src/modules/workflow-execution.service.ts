@@ -101,7 +101,14 @@ export class WorkflowExecutionService implements OnModuleInit {
       note: "Policy evaluation routed case to manager approval.",
     });
 
-    await this.approvalsService.createTask(payload.caseId, routingConfig.defaultApproverId);
+    await this.approvalsService.createMatrixTasks({
+      caseId: payload.caseId,
+      workflowType: caseRecord.workflowType,
+      latestExtractionFields: caseRecord.extractionResults[0]?.fieldsJson,
+      policyResult,
+      routingConfig,
+      managerApprovalThreshold: (await this.adminConfigService.getPolicyConfig()).managerApprovalThreshold,
+    });
     await this.notificationsService.send({
       type: "approval-required",
       recipientId: routingConfig.defaultApproverId,

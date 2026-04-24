@@ -443,6 +443,18 @@ textarea {
   border-color: rgba(30, 157, 100, 0.24);
 }
 
+.inline-status-delegated-auto {
+  color: #5b2abf;
+  background: #f2ecff;
+  border-color: rgba(110, 56, 211, 0.3);
+}
+
+.inline-status-delegated-manual {
+  color: #0f5f8e;
+  background: #eaf5ff;
+  border-color: rgba(15, 95, 142, 0.28);
+}
+
 .workspace {
   display: grid;
   gap: 28px;
@@ -1159,6 +1171,88 @@ code {
   gap: 16px;
 }
 
+.approval-stage-list {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.approval-stage-card {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel-muted);
+  padding: 12px 14px;
+  display: grid;
+  gap: 8px;
+}
+
+.approval-stage-list-compact {
+  gap: 8px;
+}
+
+.approval-stage-card-graph {
+  position: relative;
+  padding-left: 16px;
+}
+
+.approval-stage-card-graph::before {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 14px;
+  bottom: 14px;
+  width: 3px;
+  border-radius: 999px;
+  background: rgba(19, 19, 19, 0.18);
+}
+
+.approval-stage-progress-track {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(19, 19, 19, 0.12);
+}
+
+.approval-stage-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #1e9d64 0%, #16a34a 100%);
+}
+
+.approval-stage-rule-line {
+  margin: 0;
+}
+
+.approval-graph-edge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.72rem;
+  color: var(--ink-faint);
+}
+
+.approval-graph-edge-item {
+  display: inline-flex;
+  align-items: center;
+}
+
+.approval-stage-members {
+  display: grid;
+  gap: 6px;
+}
+
+.approval-stage-member {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  border-top: 1px solid var(--line);
+  padding-top: 6px;
+}
+
 .approval-topline {
   display: grid;
   gap: 12px;
@@ -1259,6 +1353,46 @@ code {
   border: 1px solid var(--line);
   border-radius: 20px;
   background: var(--panel-muted);
+}
+
+.delegation-rule-list {
+  display: grid;
+  gap: 12px;
+}
+
+.delegation-rule-card {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--panel-muted);
+  display: grid;
+  gap: 12px;
+}
+
+.delegation-rule-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.matrix-template-card {
+  background: linear-gradient(180deg, #f9f6ef 0%, var(--panel-muted) 100%);
+}
+
+.matrix-template-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.delegation-remove-button {
+  min-height: 38px;
+  padding: 0 12px;
+}
+
+.delegation-preview-list {
+  margin-top: 8px;
 }
 
 .inline-form {

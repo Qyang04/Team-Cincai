@@ -15,9 +15,13 @@ import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { FileInterceptor } from "@nestjs/platform-express";
 import {
+  approvalAnalyticsSummarySchema,
+  approvalSlaSweepResponseSchema,
   createCaseSchema,
   submitCaseSchema,
   type ApprovalActionResponse,
+  type ApprovalAnalyticsSummary,
+  type ApprovalSlaSweepResponse,
   type CaseStatus,
   type ExportActionResponse,
   type FinanceReviewActionResponse,
@@ -35,6 +39,7 @@ import {
   approvalDecisionSchema,
   attachArtifactsSchema,
   completeArtifactUploadSchema,
+  delegateApprovalSchema,
   financeDecisionSchema,
   prepareUploadSchema,
   processArtifactSchema,
@@ -444,6 +449,18 @@ export class CasesController {
     return this.approvalsService.listPendingTasks();
   }
 
+  @Get("/approvals/analytics")
+  @Roles("APPROVER", "ADMIN")
+  async getApprovalAnalytics(): Promise<ApprovalAnalyticsSummary> {
+    return approvalAnalyticsSummarySchema.parse(await this.approvalsService.getApprovalAnalytics());
+  }
+
+  @Post("/approvals/sla-sweep")
+  @Roles("ADMIN")
+  async runApprovalSlaSweep(): Promise<ApprovalSlaSweepResponse> {
+    return approvalSlaSweepResponseSchema.parse(await this.approvalsService.runSlaBreachSweep());
+  }
+
   @Post("/approvals/:taskId/approve")
   @Roles("APPROVER", "ADMIN")
   async approveTask(
@@ -460,21 +477,52 @@ export class CasesController {
       return createErrorActionResponse<ApprovalActionResponse>("Approval task not found");
     }
 
-    await this.approvalsService.markApproved(taskId, input.decisionReason);
+    await this.approvalsService.markApproved(taskId, input.decisionReason, input.approverId);
+    const stageStatus = await this.approvalsService.getStageStatus(task.caseId, task.stageNumber ?? 1);
+
+    if (stageStatus === "PENDING") {
+      const currentCase = await this.casesService.getCase(task.caseId);
+      return {
+        success: true,
+        data: {
+          case: toCaseStatusSnapshot({
+            id: task.caseId,
+            status: (currentCase?.status ?? "AWAITING_APPROVAL") as CaseStatus,
+          }),
+          exportRecord: null,
+        },
+      };
+    }
+
+    const activated = await this.approvalsService.activateNextStage(task.caseId, task.stageNumber ?? 1);
+    if (activated.activated) {
+      const currentCase = await this.casesService.getCase(task.caseId);
+      return {
+        success: true,
+        data: {
+          case: toCaseStatusSnapshot({
+            id: task.caseId,
+            status: (currentCase?.status ?? "AWAITING_APPROVAL") as CaseStatus,
+          }),
+          exportRecord: null,
+        },
+      };
+    }
+
     await this.workflowService.transitionCase({
       caseId: task.caseId,
       from: "AWAITING_APPROVAL",
       to: "APPROVED",
       actorType: "APPROVER",
       actorId: input.approverId,
-      note: input.decisionReason ?? "Approved by assigned approver.",
+      note: input.decisionReason ?? "Final matrix stage approved by approver.",
     });
     const exportReadyCase = await this.workflowService.transitionCase({
       caseId: task.caseId,
       from: "APPROVED",
       to: "EXPORT_READY",
       actorType: "SYSTEM",
-      note: "Case marked ready for export after approval.",
+      note: "Case marked ready for export after matrix completion.",
     });
     const exportRecord = await this.exportsService.ensureExportReady(task.caseId);
 
@@ -503,7 +551,8 @@ export class CasesController {
       return createErrorActionResponse<ApprovalActionResponse>("Approval task not found");
     }
 
-    await this.approvalsService.markRejected(taskId, input.decisionReason);
+    await this.approvalsService.markRejected(taskId, input.decisionReason, input.approverId);
+    await this.approvalsService.cancelRemaining(task.caseId, taskId);
     const rejected = await this.workflowService.transitionCase({
       caseId: task.caseId,
       from: "AWAITING_APPROVAL",
@@ -537,7 +586,7 @@ export class CasesController {
       return createErrorActionResponse<ApprovalActionResponse>("Approval task not found");
     }
 
-    await this.approvalsService.requestInfo(taskId, input.question);
+    await this.approvalsService.requestInfo(taskId, input.question, input.approverId);
     const updated = await this.workflowService.transitionCase({
       caseId: task.caseId,
       from: "AWAITING_APPROVAL",
@@ -553,6 +602,60 @@ export class CasesController {
       success: true,
       data: {
         case: toCaseStatusSnapshot(updated),
+      },
+    };
+  }
+
+  @Post("/approvals/:taskId/delegate")
+  @Roles("APPROVER", "ADMIN")
+  async delegateApprovalTask(
+    @Param("taskId") taskId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: { delegateTo: string; reason?: string },
+  ): Promise<ApprovalActionResponse> {
+    const input = delegateApprovalSchema.parse(body);
+    const task = await this.approvalsService.getTask(taskId);
+    if (!task) {
+      return createErrorActionResponse<ApprovalActionResponse>("Approval task not found");
+    }
+
+    if (task.status !== "PENDING" && task.status !== "INFO_REQUESTED") {
+      return createErrorActionResponse<ApprovalActionResponse>("Only pending approval tasks can be delegated");
+    }
+
+    if (task.approverId !== user.id && !user.roles.includes("ADMIN")) {
+      return createErrorActionResponse<ApprovalActionResponse>("Only the assigned approver or an admin can delegate");
+    }
+
+    await this.approvalsService.delegateTask({
+      taskId,
+      fromApproverId: task.approverId,
+      toApproverId: input.delegateTo,
+      reason: input.reason,
+    });
+
+    await this.auditService.recordEvent({
+      caseId: task.caseId,
+      eventType: "APPROVAL_TASK_DELEGATED",
+      actorType: user.roles.includes("ADMIN") ? "ADMIN" : "APPROVER",
+      actorId: user.id,
+      payload: {
+        taskId,
+        fromApproverId: task.approverId,
+        toApproverId: input.delegateTo,
+        reason: input.reason ?? null,
+      },
+    });
+
+    const caseRecord = await this.casesService.getCase(task.caseId);
+
+    return {
+      success: true,
+      data: {
+        case: toCaseStatusSnapshot({
+          id: task.caseId,
+          status: (caseRecord?.status ?? "AWAITING_APPROVAL") as CaseStatus,
+        }),
       },
     };
   }

@@ -1,5 +1,6 @@
 import {
   DEFAULT_API_BASE_URL,
+  type CaseApprovalTask,
   caseDetailResponseSchema,
   type CaseDetailResponse,
   type CaseTimelineItem,
@@ -131,6 +132,7 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
   const stage = statusMeta[caseDetail.stage] ?? statusMeta[caseDetail.status];
   const unansweredQuestions = caseDetail.openQuestions.filter((question) => question.status !== "ANSWERED");
   const timeline = buildTimeline(caseDetail);
+  const approvalStages = buildApprovalStages(caseDetail.approvalTasks);
 
   return (
     <div className="workspace workspace-tight fade-up">
@@ -416,6 +418,49 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
             </div>
           </div>
 
+          {approvalStages.length ? (
+            <>
+              <p className="detail-label">Approval matrix timeline</p>
+              <div className="approval-stage-list">
+                {approvalStages.map((stage) => (
+                  <article key={stage.stageNumber} id={`approval-stage-${stage.stageNumber}`} className="approval-stage-card">
+                    <div className="split-line">
+                      <strong>
+                        Stage {stage.stageNumber}: {stage.label}
+                      </strong>
+                      <span className={statusChipClass(stage.summaryStatus)}>{humanizeKey(stage.summaryStatus)}</span>
+                    </div>
+                    <p className="muted">
+                      Mode: {stage.mode.toLowerCase()} | Rule: {stage.dependencyType.toLowerCase()} (
+                      {stage.requiredApprovals}/{stage.totalCount}) | Completed {stage.approvedCount}/{stage.totalCount}
+                    </p>
+                    {stage.slaHours !== null || stage.stageDueAt ? (
+                      <p className="muted">
+                        SLA: {stage.slaHours !== null ? `${stage.slaHours}h` : "Not set"}
+                        {stage.stageDueAt ? ` | Stage due ${new Date(stage.stageDueAt).toLocaleString()}` : ""}
+                        {stage.escalatesTo ? ` | Escalates to ${stage.escalatesTo}` : ""}
+                      </p>
+                    ) : null}
+                    {stage.blocker ? (
+                      <p className="text-danger">
+                        Blocked by: {stage.blocker}{" "}
+                        {stage.blockerStageNumber ? <a href={`#approval-stage-${stage.blockerStageNumber}`}>Jump</a> : null}
+                      </p>
+                    ) : null}
+                    <div className="approval-stage-members">
+                      {stage.tasks.map((task) => (
+                        <div key={task.id} className="approval-stage-member">
+                          <span>{task.approverId}</span>
+                          <span className={statusChipClass(task.status)}>{humanizeKey(task.status)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </>
+          ) : null}
+
           {caseDetail.approvalTasks.length ? (
             <>
               <p className="detail-label">Approval tasks</p>
@@ -514,6 +559,91 @@ function buildTimeline(caseDetail: CaseDetailResponse): CaseTimelineItem[] {
   return [...transitionEntries, ...auditEntries].sort(
     (a, b) => new Date(b.at).getTime() - new Date(a.at).getTime(),
   );
+}
+
+type ApprovalStageView = {
+  stageNumber: number;
+  mode: string;
+  label: string;
+  dependencyType: string;
+  requiredApprovals: number;
+  slaHours: number | null;
+  stageDueAt: string | null;
+  escalatesTo: string | null;
+  tasks: CaseApprovalTask[];
+  approvedCount: number;
+  totalCount: number;
+  summaryStatus: string;
+  blocker: string | null;
+  blockerStageNumber: number | null;
+};
+
+function buildApprovalStages(tasks: CaseApprovalTask[]): ApprovalStageView[] {
+  const grouped = new Map<number, CaseApprovalTask[]>();
+  for (const task of tasks) {
+    const stageNumber = task.stageNumber ?? 1;
+    const existing = grouped.get(stageNumber);
+    if (existing) {
+      existing.push(task);
+    } else {
+      grouped.set(stageNumber, [task]);
+    }
+  }
+
+  const stageNumbers = [...grouped.keys()].sort((a, b) => a - b);
+  const stages: ApprovalStageView[] = stageNumbers.map((stageNumber) => {
+    const stageTasks = grouped.get(stageNumber) ?? [];
+    const approvedCount = stageTasks.filter((task) => task.status === "APPROVED").length;
+    const rejectedCount = stageTasks.filter((task) => task.status === "REJECTED").length;
+    const blockedCount = stageTasks.filter((task) => task.status === "BLOCKED").length;
+    const inFlightCount = stageTasks.filter(
+      (task) => task.status === "PENDING" || task.status === "INFO_REQUESTED",
+    ).length;
+    const totalCount = stageTasks.length;
+
+    let summaryStatus = "PENDING";
+    if (rejectedCount > 0) {
+      summaryStatus = "REJECTED";
+    } else if (approvedCount === totalCount && totalCount > 0) {
+      summaryStatus = "APPROVED";
+    } else if (blockedCount === totalCount && totalCount > 0) {
+      summaryStatus = "BLOCKED";
+    } else if (inFlightCount > 0 || approvedCount > 0) {
+      summaryStatus = "ACTIVE";
+    }
+
+    return {
+      stageNumber,
+      mode: stageTasks[0]?.stageMode ?? "SEQUENTIAL",
+      label: stageTasks[0]?.stageLabel ?? "Approval stage",
+      dependencyType: stageTasks[0]?.stageDependencyType ?? "ALL_REQUIRED",
+      requiredApprovals: stageTasks[0]?.stageRequiredApprovals ?? totalCount,
+      slaHours: stageTasks[0]?.stageSlaHours ?? null,
+      stageDueAt: stageTasks[0]?.stageDueAt ?? null,
+      escalatesTo: stageTasks[0]?.stageEscalatesTo ?? null,
+      tasks: stageTasks,
+      approvedCount,
+      totalCount,
+      summaryStatus,
+      blocker: null,
+      blockerStageNumber: null,
+    };
+  });
+
+  return stages.map((stage, index) => {
+    if (stage.summaryStatus !== "BLOCKED") {
+      return stage;
+    }
+    const blockingStage = stages[index - 1];
+    if (!blockingStage) {
+      return stage;
+    }
+    return {
+      ...stage,
+      blocker: `Stage ${blockingStage.stageNumber} (${blockingStage.label}) not completed`,
+      blockerStageNumber: blockingStage.stageNumber,
+    };
+  });
 }
 
 function humanizeKey(value: string): string {

@@ -1,8 +1,14 @@
 import { Injectable } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
 import {
+  adminApprovalMatrixConfigSchema,
+  adminDelegationConfigSchema,
   adminPolicyConfigSchema,
   adminRoutingConfigSchema,
+  type AdminApprovalMatrixConfig,
+  type AdminApprovalMatrixConfigUpdate,
+  type AdminDelegationConfig,
+  type AdminDelegationConfigUpdate,
   type AdminPolicyConfig,
   type AdminPolicyConfigUpdate,
   type AdminRoutingConfig,
@@ -25,6 +31,14 @@ const DEFAULT_ROUTING_CONFIG: AdminRoutingConfig = {
   defaultApproverId: "manager.approver",
   financeReviewerId: "finance.reviewer",
   escalationWindowHours: 24,
+};
+
+const DEFAULT_DELEGATION_CONFIG: AdminDelegationConfig = {
+  rules: [],
+};
+
+const DEFAULT_APPROVAL_MATRIX_CONFIG: AdminApprovalMatrixConfig = {
+  templates: [],
 };
 
 @Injectable()
@@ -65,6 +79,30 @@ export class AdminConfigService {
     const current = await this.getRoutingConfig();
     const next = adminRoutingConfigSchema.parse({ ...current, ...partial });
     await this.upsertSetting("routingConfig", next as Prisma.InputJsonValue);
+    return next;
+  }
+
+  async getDelegationConfig(): Promise<AdminDelegationConfig> {
+    const value = await this.getSetting("delegationConfig", DEFAULT_DELEGATION_CONFIG);
+    return adminDelegationConfigSchema.parse(value);
+  }
+
+  async updateDelegationConfig(partial: AdminDelegationConfigUpdate): Promise<AdminDelegationConfig> {
+    const current = await this.getDelegationConfig();
+    const next = adminDelegationConfigSchema.parse({ ...current, ...partial });
+    await this.upsertSetting("delegationConfig", next as Prisma.InputJsonValue);
+    return next;
+  }
+
+  async getApprovalMatrixConfig(): Promise<AdminApprovalMatrixConfig> {
+    const value = await this.getSetting("approvalMatrixConfig", DEFAULT_APPROVAL_MATRIX_CONFIG);
+    return adminApprovalMatrixConfigSchema.parse(value);
+  }
+
+  async updateApprovalMatrixConfig(partial: AdminApprovalMatrixConfigUpdate): Promise<AdminApprovalMatrixConfig> {
+    const current = await this.getApprovalMatrixConfig();
+    const next = adminApprovalMatrixConfigSchema.parse({ ...current, ...partial });
+    await this.upsertSetting("approvalMatrixConfig", next as Prisma.InputJsonValue);
     return next;
   }
 }

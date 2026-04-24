@@ -28,6 +28,8 @@ function createWorkflowExecutionHarness(options?: {
     getCase: async () => ({
       id: "case-1",
       status: options?.caseStatus ?? "POLICY_REVIEW",
+      workflowType: "EXPENSE_CLAIM",
+      extractionResults: [],
     }),
   };
 
@@ -43,9 +45,9 @@ function createWorkflowExecutionHarness(options?: {
   };
 
   const approvalsService = {
-    createTask: async (caseId: string, approverId: string) => {
-      createdTasks.push({ caseId, approverId });
-      return { id: "task-1", caseId, approverId };
+    createMatrixTasks: async (input: Record<string, unknown>) => {
+      createdTasks.push(input);
+      return [{ id: "task-1", caseId: input.caseId, approverId: "configured.approver" }];
     },
   };
 
@@ -92,6 +94,15 @@ function createWorkflowExecutionHarness(options?: {
         financeReviewerId: "configured.finance",
         escalationWindowHours: 24,
       },
+    getPolicyConfig: async () => ({
+      managerApprovalThreshold: 500,
+      requireProjectCodeWorkflows: ["EXPENSE_CLAIM"],
+      duplicateFilenameDetection: true,
+      invoiceNumberRequiredForVendorInvoices: true,
+    }),
+    getApprovalMatrixConfig: async () => ({
+      templates: [],
+    }),
   };
 
   const service = new WorkflowExecutionService(
@@ -130,7 +141,21 @@ test("WorkflowExecutionService routes policy-passing cases to the configured app
   assert.deepEqual(harness.createdTasks, [
     {
       caseId: "case-1",
-      approverId: "configured.approver",
+      workflowType: "EXPENSE_CLAIM",
+      latestExtractionFields: undefined,
+      policyResult: {
+        passed: true,
+        warnings: [],
+        blockingIssues: [],
+        requiresFinanceReview: false,
+        duplicateSignals: [],
+      },
+      routingConfig: {
+        defaultApproverId: "configured.approver",
+        financeReviewerId: "configured.finance",
+        escalationWindowHours: 24,
+      },
+      managerApprovalThreshold: 500,
     },
   ]);
   assert.equal(harness.notifications[0]?.recipientId, "configured.approver");

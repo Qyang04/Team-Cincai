@@ -48,3 +48,52 @@ export const adminConnectorStatusSchema = z.object({
 });
 export const adminConnectorsResponseSchema = z.array(adminConnectorStatusSchema);
 export type AdminConnectorStatus = z.infer<typeof adminConnectorStatusSchema>;
+
+export const adminDelegationRuleSchema = z.object({
+  approverId: z.string().min(1),
+  delegateTo: z.string().min(1),
+  enabled: z.boolean().default(true),
+  outOfOfficeUntil: z.string().datetime().nullable().optional(),
+  note: z.string().max(2000).optional(),
+});
+export type AdminDelegationRule = z.infer<typeof adminDelegationRuleSchema>;
+
+export const adminDelegationConfigSchema = z.object({
+  rules: z.array(adminDelegationRuleSchema),
+});
+export type AdminDelegationConfig = z.infer<typeof adminDelegationConfigSchema>;
+export const adminDelegationConfigUpdateSchema = adminDelegationConfigSchema.partial();
+export type AdminDelegationConfigUpdate = z.infer<typeof adminDelegationConfigUpdateSchema>;
+
+export const approvalStageModeSchema = z.enum(["SEQUENTIAL", "PARALLEL"]);
+export const approvalStageDependencyTypeSchema = z.enum(["ALL_REQUIRED", "ANY_ONE", "MIN_N"]);
+
+export const adminApprovalMatrixStageConditionSchema = z.object({
+  workflowTypes: z.array(workflowTypeIdentifierSchema).optional(),
+  minAmount: z.number().min(0).optional(),
+  maxAmount: z.number().min(0).optional(),
+  departments: z.array(z.string().min(1)).optional(),
+  costCenterPrefixes: z.array(z.string().min(1)).optional(),
+});
+export type AdminApprovalMatrixStageCondition = z.infer<typeof adminApprovalMatrixStageConditionSchema>;
+
+export const adminApprovalMatrixStageTemplateSchema = z.object({
+  stageOrder: z.number().int().positive(),
+  label: z.string().min(1),
+  approverIds: z.array(z.string().min(1)).min(1),
+  mode: approvalStageModeSchema,
+  dependencyType: approvalStageDependencyTypeSchema,
+  requiredApprovals: z.number().int().positive().optional(),
+  slaHours: z.number().int().positive().nullable().optional(),
+  escalatesTo: z.string().min(1).nullable().optional(),
+  enabled: z.boolean().default(true),
+  conditions: adminApprovalMatrixStageConditionSchema.optional(),
+});
+export type AdminApprovalMatrixStageTemplate = z.infer<typeof adminApprovalMatrixStageTemplateSchema>;
+
+export const adminApprovalMatrixConfigSchema = z.object({
+  templates: z.array(adminApprovalMatrixStageTemplateSchema),
+});
+export type AdminApprovalMatrixConfig = z.infer<typeof adminApprovalMatrixConfigSchema>;
+export const adminApprovalMatrixConfigUpdateSchema = adminApprovalMatrixConfigSchema.partial();
+export type AdminApprovalMatrixConfigUpdate = z.infer<typeof adminApprovalMatrixConfigUpdateSchema>;

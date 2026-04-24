@@ -83,6 +83,9 @@ function createCasesControllerHarness(options?: {
     markApproved: async () => undefined,
     markRejected: async () => undefined,
     requestInfo: async () => undefined,
+    getStageStatus: async () => "APPROVED",
+    activateNextStage: async () => ({ activated: false }),
+    cancelRemaining: async () => undefined,
   };
 
   const workflowService = {

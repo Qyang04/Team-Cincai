@@ -38,7 +38,7 @@ The repo already has a strong `workflow backbone`, but it does not yet satisfy t
 
 ### What is still missing or thin
 
-- multi-tier approval matrix depth
+- matrix governance depth (admin-defined matrix templates, escalation execution, and governance analytics)
 - FX reconciliation behavior
 - tax extraction and arithmetic validation
 - richer duplicate and fraud detection
@@ -126,7 +126,7 @@ Still needed:
 
 ### Approvals
 
-Status: `Single-step only`
+Status: `Matrix MVP+ in place, substantial depth implemented`
 
 Already present:
 
@@ -134,15 +134,30 @@ Already present:
 - approve, reject, request-info loop
 - task reopen after requester answer
 - routing-configured default approver
+- first-class `ApprovalMatrix` / `ApprovalStage` persistence models
+- matrix-aware task metadata persisted on approval tasks (`stageNumber`, `stageMode`, `stageLabel`)
+- explicit stage semantics persisted and enforced (`dependencyType`, quorum via `requiredApprovals`)
+- stage-level SLA/escalation metadata persisted (`slaHours`, `dueAt`, `escalatesTo`, `escalatedAt`)
+- sequential and parallel stage progression for configured workflow paths
+- conditional stage tiers by amount, workflow type, department, and cost center
+- manual delegation endpoint and approval UI action
+- admin-configured out-of-office auto-delegation rules
+- structured admin delegation UX (CRUD-style rule editor with local datetime input + active rule preview)
+- queue visibility for stage and delegation context
+- case-detail matrix visualization (stage timeline/cards, blockers, per-stage members and status)
 
-Still needed:
+Recently completed:
 
-- approval matrix persistence
-- sequential approvals
-- parallel approvals
-- conditional tiers by amount, department, workflow, or cost center
-- delegation and out-of-office behavior
-- approval visibility at matrix level, not only task level
+- scheduled SLA breach handling is active (interval sweep, auto-escalation, reminder notifications)
+- SLA reminder cooldown state is persisted to avoid duplicate reminders across restarts
+- admin-managed matrix template authoring is live (stage order/mode/dependency/quorum/SLA/escalation + conditions)
+- cross-surface matrix visualization now spans queue + case with dependency sequencing and blocker drill-down links
+- approval analytics are exposed and rendered (throughput, bottleneck stage, delegation and escalation impact)
+
+Polish still possible (non-blocking):
+
+- richer node-edge graph rendering beyond stage-card/timeline visualization
+- historical trend charts for analytics (for example weekly deltas)
 
 ### Finance review
 
@@ -457,52 +472,41 @@ Not yet done:
 
 What needs to be implemented:
 
-- persist approval matrix definition per case
-- support one case having multiple approval tasks
-- support matrix patterns:
-- single approver
-- sequential chain
-- parallel approvals
-- conditional extra tier
-- finance coding review after business approvals
+- matrix governance layer on top of the implemented matrix core:
+- admin-authored matrix templates and stage rules
+- SLA breach execution (escalation/reminder behavior)
+- analytics around stage throughput, blockers, and delegation impact
+- richer cross-surface matrix graph views with dependency edges
 
 Needed in `packages/shared`:
 
-- approval matrix contracts
-- approval stage summary contract
-- approval dependency state
-- delegation and substitute approver fields
+- explicit matrix template contracts for admin-authoring (stage config, dependency type, quorum, escalation policy)
+- graph-oriented matrix view contract for queue and case surfaces
+- approval analytics summary contracts
 
 Needed in `schema.prisma`:
 
-- `ApprovalMatrix` model
-- richer `ApprovalTask` with:
-- step number
-- group key
-- dependency type
-- delegatedFrom
-- actingApproverId
+- SLA execution persistence (escalation attempts, reminder timestamps, outcome metadata)
+- optional analytics rollup persistence if pre-computed metrics are introduced
 
 Needed in `apps/api`:
 
-- approval matrix builder from policy outcome
-- logic for opening the correct next tasks
-- logic for parallel completion
-- logic for blocking export until all required approvals finish
-- rejection propagation across the full matrix
+- admin-driven matrix template resolver and evaluator (instead of service-hardcoded stages only)
+- SLA breach evaluator and escalation/reminder job execution
+- matrix analytics endpoints and aggregation logic
 
 Needed in `apps/web`:
 
-- matrix visibility in case detail
-- progress view for current approval stage
-- clearer view of who already approved and who is still pending
+- matrix graph view with dependency edges and blocker drill-down across case and queue
+- admin matrix-template management UI
+- approval analytics surfaces for bottlenecks and delegation impact
 
 Verification needed:
 
-- sequential two-step approval
-- parallel all-required approval
-- delegated approver path
-- rejection at intermediate step blocks export
+- SLA-breach reminder and escalation behavior
+- admin-authored template application across workflow variants
+- graph visualization accuracy for blocked dependencies
+- analytics correctness against approval task outcomes
 
 #### Section B: FX reconciliation
 
@@ -909,7 +913,7 @@ Still needed:
 ### Needed next
 
 - explicit stage metadata contracts
-- approval matrix contracts
+- matrix template authoring contracts
 - reconciliation flag contracts
 - richer duplicate/fraud signal contracts
 - normalized export payload contract
@@ -935,12 +939,12 @@ Still needed:
 
 ### Needed next
 
-- approval matrix persistence
 - reconciliation flags persistence
 - approval requirement persistence
 - richer anomaly persistence
 - better failure categorization persistence
 - optional assignment and work-ownership persistence
+- escalation execution persistence
 
 ---
 
@@ -1042,8 +1046,8 @@ Still needed:
 - reconciliation flags
 - approval requirement
 - richer failure categories
-- approval matrix models
-4. Implement approval matrix depth.
+- escalation execution metadata
+4. Implement matrix governance depth (admin templates + SLA execution + analytics).
 5. Implement first real finance correctness slice:
 - FX discrepancy flow or tax mismatch flow
 
@@ -1098,10 +1102,10 @@ If the team wants a clean next sprint breakdown, use these epics:
 
 ### Epic 2: Approval Matrix Engine
 
-- matrix contracts
-- matrix persistence
-- sequential and parallel logic
-- matrix UI
+- admin matrix-template contracts and management
+- escalation and reminder execution for SLA breaches
+- graph-grade matrix visualization
+- matrix analytics
 
 ### Epic 3: Finance Correctness Slice
 

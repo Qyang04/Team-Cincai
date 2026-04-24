@@ -138,6 +138,17 @@ export const caseApprovalTaskSchema = z.object({
   id: z.string().min(1),
   caseId: z.string().min(1),
   approverId: z.string().min(1),
+  stageNumber: z.number().int().positive().optional(),
+  stageMode: z.string().min(1).optional(),
+  stageLabel: nullableStringSchema.optional(),
+  stageDependencyType: z.string().min(1).optional(),
+  stageRequiredApprovals: z.number().int().positive().optional(),
+  stageSlaHours: z.number().int().positive().nullable().optional(),
+  stageDueAt: nullableIsoDateTimeStringSchema.optional(),
+  stageEscalatesTo: nullableStringSchema.optional(),
+  stageEscalatedAt: nullableIsoDateTimeStringSchema.optional(),
+  delegatedFrom: nullableStringSchema.optional(),
+  actingApproverId: nullableStringSchema.optional(),
   status: z.string().min(1),
   decision: nullableStringSchema.optional(),
   decisionReason: nullableStringSchema.optional(),
@@ -277,6 +288,31 @@ export const approvalQueueItemSchema = caseApprovalTaskSchema.extend({
 });
 export const approvalQueueResponseSchema = z.array(approvalQueueItemSchema);
 export type ApprovalQueueItem = z.infer<typeof approvalQueueItemSchema>;
+
+export const approvalAnalyticsSummarySchema = z.object({
+  pendingTasks: z.number().int().nonnegative(),
+  blockedTasks: z.number().int().nonnegative(),
+  approvedLast7d: z.number().int().nonnegative(),
+  rejectedLast7d: z.number().int().nonnegative(),
+  delegatedOpenTasks: z.number().int().nonnegative(),
+  escalatedStages: z.number().int().nonnegative(),
+  overdueActiveStages: z.number().int().nonnegative(),
+  avgApprovalHours: z.number().nullable(),
+  bottleneckStage: z
+    .object({
+      stageNumber: z.number().int().positive(),
+      pendingCount: z.number().int().nonnegative(),
+    })
+    .nullable(),
+});
+export type ApprovalAnalyticsSummary = z.infer<typeof approvalAnalyticsSummarySchema>;
+
+export const approvalSlaSweepResponseSchema = z.object({
+  escalatedStages: z.number().int().nonnegative(),
+  escalatedTasks: z.number().int().nonnegative(),
+  reminderCandidates: z.number().int().nonnegative(),
+});
+export type ApprovalSlaSweepResponse = z.infer<typeof approvalSlaSweepResponseSchema>;
 
 export const financeReviewQueueItemSchema = caseFinanceReviewItemSchema.extend({
   case: caseSummarySchema.pick({

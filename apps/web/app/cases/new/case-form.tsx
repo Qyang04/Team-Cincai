@@ -222,6 +222,7 @@ export function CaseForm() {
           className="intake-dropzone"
           role="button"
           tabIndex={0}
+          suppressHydrationWarning
           onClick={() => fileInputRef.current?.click()}
           onKeyDown={(event) => {
             if (event.key === "Enter" || event.key === " ") {

@@ -6,7 +6,7 @@ import { useState, useTransition } from "react";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
 
-type Mode = "approve" | "reject" | "request-info";
+type Mode = "approve" | "reject" | "request-info" | "delegate";
 
 type Feedback = { kind: "success"; message: string } | { kind: "error"; message: string } | null;
 
@@ -22,9 +22,16 @@ export function ApprovalActionForm({ taskId }: { taskId: string }) {
 
     const approverId = String(formData.get("approverId") ?? "manager.approver").trim() || "manager.approver";
     const detail = String(formData.get("detail") ?? "").trim();
+    const delegateTo = String(formData.get("delegateTo") ?? "").trim();
 
     if (mode === "request-info" && !detail) {
       setFeedback({ kind: "error", message: "Please describe what information is needed from the requester." });
+      setPendingMode(null);
+      return;
+    }
+
+    if (mode === "delegate" && !delegateTo) {
+      setFeedback({ kind: "error", message: "Please provide a delegate approver ID." });
       setPendingMode(null);
       return;
     }
@@ -34,6 +41,8 @@ export function ApprovalActionForm({ taskId }: { taskId: string }) {
         const body =
           mode === "request-info"
             ? { approverId, question: detail }
+            : mode === "delegate"
+            ? { approverId, delegateTo, reason: detail || undefined }
             : { approverId, decisionReason: detail || undefined };
 
         const response = await fetch(`${apiBaseUrl}/cases/approvals/${taskId}/${mode}`, {
@@ -59,6 +68,8 @@ export function ApprovalActionForm({ taskId }: { taskId: string }) {
             ? "Approved. Case moved toward export-ready."
             : mode === "reject"
             ? "Rejected. Case moved to REJECTED."
+            : mode === "delegate"
+            ? `Delegated to ${delegateTo}.`
             : "Information requested. Requester has been notified in-app.";
 
         setFeedback({ kind: "success", message: successMessage });
@@ -95,7 +106,17 @@ export function ApprovalActionForm({ taskId }: { taskId: string }) {
         <textarea
           name="detail"
           rows={3}
-          placeholder="Optional rationale for approve / reject. Required when requesting info."
+          placeholder="Optional rationale for approve/reject/delegate. Required when requesting info."
+          className="field-control"
+          suppressHydrationWarning
+        />
+      </label>
+
+      <label className="field">
+        <span className="field-label">Delegate to (approver ID)</span>
+        <input
+          name="delegateTo"
+          placeholder="backup.approver"
           className="field-control"
           suppressHydrationWarning
         />
@@ -128,6 +149,15 @@ export function ApprovalActionForm({ taskId }: { taskId: string }) {
           suppressHydrationWarning
         >
           {isPending && pendingMode === "request-info" ? "Sending..." : "Request info"}
+        </button>
+        <button
+          type="button"
+          className="button-secondary"
+          disabled={isPending}
+          onClick={(event) => submit("delegate", new FormData(event.currentTarget.form ?? undefined))}
+          suppressHydrationWarning
+        >
+          {isPending && pendingMode === "delegate" ? "Delegating..." : "Delegate"}
         </button>
       </div>
 
