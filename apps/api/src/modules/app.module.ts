@@ -16,6 +16,7 @@ import { ConnectorHealthService } from "./connector-health.service";
 import { ExportsService } from "./exports.service";
 import { FinanceReviewService } from "./finance-review.service";
 import { JobRunnerService } from "./job-runner.service";
+import { LocalArtifactStorageService } from "./local-artifact-storage.service";
 import { CasesService } from "./cases.service";
 import { IntakeService } from "./intake.service";
 import { MockAiProviderService } from "./mock-ai-provider.service";
@@ -61,6 +62,7 @@ import { JwtModule } from "@nestjs/jwt";
     QueueWorkerService,
     MockAiProviderService,
     ZaiAiProviderService,
+    LocalArtifactStorageService,
     StorageService,
     {
       provide: APP_GUARD,

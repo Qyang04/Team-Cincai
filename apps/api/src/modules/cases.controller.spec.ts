@@ -170,6 +170,7 @@ function createCasesControllerHarness(options?: {
     } as never,
     { ensureExportReady: async () => undefined, getLatest: async () => undefined } as never,
     { prepareUpload: async () => undefined } as never,
+    { saveUploadedFile: async () => ({ storageUri: "local://case-1/mock-stored" }) } as never,
     workflowOrchestrator as never,
   );
 

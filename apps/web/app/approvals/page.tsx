@@ -61,7 +61,9 @@ export default async function ApprovalsPage() {
           <span className="kicker">Approval lane</span>
           <h1>Pending approvals</h1>
           <p className="section-copy">
-            Review cases routed by policy. Each decision is captured in the audit trail with rationale.
+            Review cases routed by policy. Each decision is captured in the audit trail with rationale. Open a case to
+            preview attachments: click a filename in the Artifacts block to view images, PDFs, and text in a dialog (PDFs
+            scroll between pages in the built-in viewer).
           </p>
         </div>
         <div className="split-actions">

@@ -1,12 +1,17 @@
 import { Injectable } from "@nestjs/common";
+import { readFile } from "node:fs/promises";
 import { ArtifactsService } from "./artifacts.service";
 import { AuditService } from "./audit.service";
+import { LocalArtifactStorageService } from "./local-artifact-storage.service";
+
+const TEXT_MIME_HINTS = /^(text\/|application\/(json|xml|javascript|x-www-form-urlencoded)|message\/)/i;
 
 @Injectable()
 export class ArtifactExtractionService {
   constructor(
     private readonly artifactsService: ArtifactsService,
     private readonly auditService: AuditService,
+    private readonly localArtifactStorage: LocalArtifactStorageService,
   ) {}
 
   async processArtifact(artifactId: string) {
@@ -18,7 +23,11 @@ export class ArtifactExtractionService {
     await this.artifactsService.markProcessing(artifactId);
 
     try {
-      const extractedText = this.mockExtract(artifact.filename, artifact.mimeType ?? undefined);
+      const extractedText = await this.mockExtract(
+        artifact.filename,
+        artifact.mimeType ?? undefined,
+        artifact.storageUri ?? undefined,
+      );
       const updated = await this.artifactsService.markProcessed(artifactId, extractedText);
 
       await this.auditService.recordEvent({
@@ -52,7 +61,7 @@ export class ArtifactExtractionService {
     }
   }
 
-  private mockExtract(filename: string, mimeType?: string) {
+  private async mockExtract(filename: string, mimeType?: string, storageUri?: string) {
     const lower = filename.toLowerCase();
     if (lower.includes("fail-process")) {
       throw new Error("Mock extraction failure triggered by filename.");
@@ -64,6 +73,25 @@ export class ArtifactExtractionService {
       mimeType ? `mime:${mimeType}` : null,
     ].filter(Boolean);
 
-    return `mock-extracted-text(${hints.join(",") || "generic"}): ${filename}`;
+    let fileSnippet = "";
+    if (storageUri) {
+      const localPath = this.localArtifactStorage.resolveLocalPath(storageUri);
+      if (localPath) {
+        try {
+          const buf = await readFile(localPath);
+          const asText = TEXT_MIME_HINTS.test(mimeType ?? "") || lower.endsWith(".txt") || lower.endsWith(".csv");
+          if (asText) {
+            fileSnippet = buf.toString("utf8").slice(0, 24_000);
+          } else {
+            fileSnippet = `[binary file ${buf.byteLength} bytes on disk]`;
+          }
+        } catch {
+          fileSnippet = "[local file read failed]";
+        }
+      }
+    }
+
+    const base = `mock-extracted-text(${hints.join(",") || "generic"}): ${filename}`;
+    return fileSnippet ? `${base}\n\n--- file content ---\n${fileSnippet}` : base;
   }
 }

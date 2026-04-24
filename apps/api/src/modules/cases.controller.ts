@@ -1,4 +1,19 @@
-import { Body, Controller, Get, Param, Post } from "@nestjs/common";
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  NotFoundException,
+  Param,
+  Post,
+  StreamableFile,
+  UploadedFile,
+  UseInterceptors,
+} from "@nestjs/common";
+import { createReadStream } from "node:fs";
+import { stat } from "node:fs/promises";
+import { FileInterceptor } from "@nestjs/platform-express";
 import {
   createCaseSchema,
   submitCaseSchema,
@@ -32,6 +47,7 @@ import { PolicyService } from "./policy.service";
 import { CurrentUser } from "./current-user.decorator";
 import type { AuthenticatedUser } from "./auth.types";
 import { Roles } from "./roles.decorator";
+import { LocalArtifactStorageService } from "./local-artifact-storage.service";
 import { StorageService } from "./storage.service";
 import { WorkflowOrchestratorService } from "./workflow-orchestrator.service";
 import { WorkflowService } from "./workflow.service";
@@ -82,6 +98,23 @@ function toFinanceReviewResolution(input: {
   };
 }
 
+function guessContentTypeFromFilename(filename: string): string {
+  const ext = filename.toLowerCase().split(".").pop() ?? "";
+  const map: Record<string, string> = {
+    pdf: "application/pdf",
+    png: "image/png",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    gif: "image/gif",
+    webp: "image/webp",
+    txt: "text/plain",
+    csv: "text/csv",
+    json: "application/json",
+    html: "text/html",
+  };
+  return map[ext] ?? "application/octet-stream";
+}
+
 @Controller("cases")
 export class CasesController {
   constructor(
@@ -96,6 +129,7 @@ export class CasesController {
     private readonly financeReviewService: FinanceReviewService,
     private readonly exportsService: ExportsService,
     private readonly storageService: StorageService,
+    private readonly localArtifactStorage: LocalArtifactStorageService,
     private readonly workflowOrchestrator: WorkflowOrchestratorService,
   ) {}
 
@@ -134,12 +168,99 @@ export class CasesController {
     },
   ) {
     const input = submitCaseSchema.parse(body);
-    return this.workflowOrchestrator.submitDraftCase(id, input);
+    const result = await this.workflowOrchestrator.submitDraftCase(id, input);
+    if (result && typeof result === "object" && "error" in result) {
+      throw new BadRequestException(String((result as { error: string }).error));
+    }
+    return result;
   }
 
   @Get(":id/artifacts")
   getArtifacts(@Param("id") id: string) {
     return this.artifactsService.listForCase(id);
+  }
+
+  @Get(":id/artifacts/:artifactId/file")
+  async getArtifactFile(@Param("id") caseId: string, @Param("artifactId") artifactId: string) {
+    const artifact = await this.artifactsService.getArtifact(artifactId);
+    if (!artifact || artifact.caseId !== caseId) {
+      throw new NotFoundException("Artifact not found");
+    }
+
+    const uri = artifact.storageUri;
+    if (!uri || !uri.startsWith("local://")) {
+      throw new NotFoundException(
+        "This artifact has no on-disk file (mock filename-only or remote storage). It cannot be previewed here.",
+      );
+    }
+
+    const absolutePath = this.localArtifactStorage.resolveLocalPath(uri);
+    if (!absolutePath) {
+      throw new NotFoundException("Storage path is invalid");
+    }
+
+    try {
+      const fileStat = await stat(absolutePath);
+      if (!fileStat.isFile()) {
+        throw new NotFoundException("Artifact is not a file");
+      }
+    } catch (error) {
+      if (error && typeof error === "object" && "code" in error && (error as NodeJS.ErrnoException).code === "ENOENT") {
+        throw new NotFoundException("File is missing on the server");
+      }
+      throw error;
+    }
+
+    const stream = createReadStream(absolutePath);
+    const contentType = artifact.mimeType?.trim() || guessContentTypeFromFilename(artifact.filename);
+
+    return new StreamableFile(stream, {
+      type: contentType,
+      disposition: `inline; filename*=UTF-8''${encodeURIComponent(artifact.filename)}`,
+    });
+  }
+
+  @Post(":id/artifacts/upload")
+  @UseInterceptors(
+    FileInterceptor("file", {
+      limits: { fileSize: 25 * 1024 * 1024 },
+    }),
+  )
+  async uploadArtifactFile(
+    @Param("id") id: string,
+    @UploadedFile() file: { buffer: Buffer; originalname: string; mimetype: string } | undefined,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    if (!file?.buffer?.length) {
+      throw new BadRequestException('Missing file body (multipart field name must be "file").');
+    }
+
+    const caseRecord = await this.casesService.getCase(id);
+    if (!caseRecord) {
+      throw new NotFoundException("Case not found");
+    }
+    if (caseRecord.status !== "DRAFT") {
+      throw new BadRequestException("Artifacts can only be uploaded while the case is in DRAFT.");
+    }
+    if (caseRecord.requesterId !== user.id) {
+      throw new ForbiddenException("Only the requester can upload artifacts for this case.");
+    }
+
+    const originalName = file.originalname || "upload.bin";
+    const { storageUri } = await this.localArtifactStorage.saveUploadedFile(id, originalName, file.buffer);
+
+    const created = await this.artifactsService.createUploadedPlaceholder(id, {
+      filename: originalName,
+      mimeType: file.mimetype,
+      storageUri,
+    });
+
+    const outcome = await this.workflowOrchestrator.processArtifactUpload(id, created.id, storageUri);
+    if (outcome && typeof outcome === "object" && "error" in outcome) {
+      throw new BadRequestException(String((outcome as { error: string }).error));
+    }
+
+    return { artifact: outcome };
   }
 
   @Post(":id/artifacts/upload-url")

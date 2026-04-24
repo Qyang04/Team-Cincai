@@ -5,6 +5,21 @@ import { PrismaService } from "./prisma.service";
 export class ArtifactsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async createUploadedPlaceholder(
+    caseId: string,
+    input: { filename: string; mimeType?: string; storageUri: string },
+  ) {
+    return this.prisma.artifact.create({
+      data: {
+        caseId,
+        filename: input.filename,
+        mimeType: input.mimeType,
+        storageUri: input.storageUri,
+        processingStatus: "PREPARED",
+      },
+    });
+  }
+
   async attachMany(
     caseId: string,
     filenames: string[],

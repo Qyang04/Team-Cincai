@@ -46,6 +46,7 @@ function createWorkflowOrchestratorHarness() {
         filename: filenames[index],
       }));
     },
+    listForCase: async () => [],
     getArtifact: async (artifactId: string) => ({
       id: artifactId,
       caseId: "case-1",

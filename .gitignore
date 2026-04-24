@@ -9,4 +9,5 @@ coverage/
 apps/api/prisma/dev.db
 apps/api/prisma/dev.db-journal
 *.tsbuildinfo
+.local-artifacts/
 reference UI/

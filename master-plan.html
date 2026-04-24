@@ -510,6 +510,101 @@
       padding: 28px 0 8px;
     }
 
+    .status-intro {
+      max-width: 72ch;
+      line-height: 1.7;
+      color: var(--muted);
+      margin: 0 0 20px;
+    }
+
+    .status-area {
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 20px 22px;
+      background: rgba(255, 255, 255, 0.72);
+      margin-bottom: 14px;
+    }
+
+    .status-area h3 {
+      margin: 0 0 14px;
+      font-size: 18px;
+      letter-spacing: -0.02em;
+    }
+
+    .status-duo {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .status-col h4 {
+      margin: 0 0 10px;
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .status-col.done h4 { color: var(--accent); }
+    .status-col.todo h4 { color: #b45309; }
+
+    ul.status-list {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 14px;
+    }
+
+    ul.status-list li { margin-bottom: 6px; }
+
+    .phase-table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: rgba(255, 255, 255, 0.85);
+      margin-top: 18px;
+    }
+
+    table.phase-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+      min-width: 720px;
+    }
+
+    table.phase-table th,
+    table.phase-table td {
+      padding: 12px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+
+    table.phase-table th {
+      background: #f7f2e8;
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    table.phase-table tr:last-child td { border-bottom: none; }
+
+    table.phase-table td strong { color: var(--ink); }
+
+    .doc-link {
+      margin-top: 16px;
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .doc-link a {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
     @media (max-width: 1100px) {
       .hero, .grid-2, .grid-3, .arch-row.two, .arch-row.three, .roadmap {
         grid-template-columns: 1fr;
@@ -525,6 +620,7 @@
       .metrics, .runtime-grid { grid-template-columns: 1fr; }
       .flow-step, .bar-row { grid-template-columns: 1fr; }
       .tag { justify-self: start; }
+      .status-duo { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -919,6 +1015,220 @@ stateDiagram-v2
           </div>
         </div>
       </div>
+    </section>
+
+    <section class="panel section">
+      <div class="section-head">
+        <div>
+          <span class="eyebrow">Repository status</span>
+          <h2>What is already built versus what is still open.</h2>
+        </div>
+        <p>
+          This is the execution-facing view: <strong>in the repo today</strong> versus <strong>not done yet</strong>, aligned with
+          <code>master-plan-repo-status-and-execution-guide.md</code> (inspection snapshot 2026-04-23). The rest of this HTML page describes the target architecture; this section tracks delivery reality.
+        </p>
+      </div>
+
+      <p class="status-intro">
+        The codebase has a strong workflow backbone (states, transitions, case detail, approvals, finance review, export, recoverable exceptions, mock-first seams).
+        The largest gap is <strong>finance depth</strong>: multi-tier approvals, FX and tax behavior, richer duplicate signals, evidence-driven extraction, and production-grade auth and connectors.
+      </p>
+
+      <div class="status-area">
+        <h3>Case lifecycle and orchestration</h3>
+        <div class="status-duo">
+          <div class="status-col done">
+            <h4>In the repo today</h4>
+            <ul class="status-list">
+              <li>Canonical workflow enum and transition rules in shared contracts; enforcement in the API.</li>
+              <li>Orchestrated submission from draft through intake processing.</li>
+              <li>Policy routing job, export job, recoverable exception re-entry.</li>
+              <li>End-to-end path through clarification or policy, approval or finance review, export or recoverable exception.</li>
+            </ul>
+          </div>
+          <div class="status-col todo">
+            <h4>Not done yet</h4>
+            <ul class="status-list">
+              <li>Explicit stage registry (entry or exit conditions, success or failure transitions, stage-level audit rules).</li>
+              <li>First-class manual-owner metadata at human gates.</li>
+              <li>Richer failure categories and stage-specific retry metadata.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="status-area">
+        <h3>AI intake and extraction</h3>
+        <div class="status-duo">
+          <div class="status-col done">
+            <h4>In the repo today</h4>
+            <ul class="status-list">
+              <li>Mock extraction shape, mock clarification, mock routing wired through the flow.</li>
+              <li>Optional Z.AI provider path alongside mock AI.</li>
+            </ul>
+          </div>
+          <div class="status-col todo">
+            <h4>Not done yet</h4>
+            <ul class="status-list">
+              <li>Evidence-aware extraction from uploads (OCR, real text, evidence-linked metadata).</li>
+              <li>Broader fields and stronger per-field confidence and provenance.</li>
+              <li>Invalid or unsafe AI output handling beyond basic failure paths.</li>
+              <li>Workflow-specific prompting and extraction rules.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="status-area">
+        <h3>Policy and routing</h3>
+        <div class="status-duo">
+          <div class="status-col done">
+            <h4>In the repo today</h4>
+            <ul class="status-list">
+              <li>Project code requirement by workflow; amount threshold routing; vendor invoice number warning.</li>
+              <li>Simple duplicate signals (for example filename); admin thresholds and basic routing defaults.</li>
+            </ul>
+          </div>
+          <div class="status-col todo">
+            <h4>Not done yet</h4>
+            <ul class="status-list">
+              <li>Reconciliation flags and approval-requirement outputs driving export readiness in depth.</li>
+              <li>Workflow-specific policy packs; richer duplicate and anomaly reasoning with cross-case signals.</li>
+              <li>Tax and arithmetic checks; FX policy (estimate vs proof vs escalation).</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="status-area">
+        <h3>Approvals</h3>
+        <div class="status-duo">
+          <div class="status-col done">
+            <h4>In the repo today</h4>
+            <ul class="status-list">
+              <li>Approval queue; approve, reject, request-info; reopen after requester answers.</li>
+              <li>Routing-configured default approver; single-step approval for the MVP path.</li>
+            </ul>
+          </div>
+          <div class="status-col todo">
+            <h4>Not done yet</h4>
+            <ul class="status-list">
+              <li>Approval matrix persistence and multi-task patterns.</li>
+              <li>Sequential, parallel, and conditional tiers; delegation and substitutes.</li>
+              <li>Matrix-level UI (pending vs completed, stage progress).</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="status-area">
+        <h3>Finance review</h3>
+        <div class="status-duo">
+          <div class="status-col done">
+            <h4>In the repo today</h4>
+            <ul class="status-list">
+              <li>Finance queue; approve, reject, send-back; policy routing into finance.</li>
+              <li>Send-back into clarification and resume.</li>
+            </ul>
+          </div>
+          <div class="status-col todo">
+            <h4>Not done yet</h4>
+            <ul class="status-list">
+              <li>Richer reason categories and finance coding or resolution fields.</li>
+              <li>Reconciliation-specific resolution data (settled amount, evidence notes).</li>
+              <li>Queue assignment and case ownership in the finance queue.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="status-area">
+        <h3>Export, audit, admin, auth, cross-cutting</h3>
+        <div class="status-duo">
+          <div class="status-col done">
+            <h4>In the repo today</h4>
+            <ul class="status-list">
+              <li><strong>Export or audit:</strong> export-ready, processing, recoverable export failure; audit and transitions in UI.</li>
+              <li><strong>Admin:</strong> policy settings, routing settings, connector status surface.</li>
+              <li><strong>Auth:</strong> request user resolution, role guards, mock headers, optional Supabase JWT path.</li>
+              <li><strong>Shared or schema or web or tests:</strong> core enums and models, case detail contracts, main web surfaces, API and schema tests, build green, mock integrations and BullMQ-ready queue.</li>
+            </ul>
+          </div>
+          <div class="status-col todo">
+            <h4>Not done yet</h4>
+            <ul class="status-list">
+              <li><strong>Export:</strong> normalized accounting payload spec, handoff history, retry metadata, operational analytics.</li>
+              <li><strong>Admin:</strong> matrix config, workflow-specific policy editing, FX or tax policy, connector credentials and change history.</li>
+              <li><strong>Auth:</strong> real sign-in and session UX, org and manager mapping, approver identity beyond defaults.</li>
+              <li><strong>Contracts or DB:</strong> stage and matrix contracts, reconciliation and anomaly persistence, assignment fields.</li>
+              <li><strong>Web or integrations or tests:</strong> inbox filtering and assignment, matrix or finance UI depth, real OCR or notifications or export or directory, web and integration tests and seeded demo verification.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-table-wrap">
+        <table class="phase-table">
+          <thead>
+            <tr>
+              <th>Phase</th>
+              <th>Title</th>
+              <th>Repo status</th>
+              <th>Main gap</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>0</strong></td>
+              <td>Master spec and alignment</td>
+              <td>Done; sharpen</td>
+              <td>Keep plan and code terminology aligned; surface backlog clearly.</td>
+            </tr>
+            <tr>
+              <td><strong>1</strong></td>
+              <td>Stabilize prototype</td>
+              <td>Mostly done</td>
+              <td>Doc drift, lint consistency, guarded routes, manual demo scripts.</td>
+            </tr>
+            <tr>
+              <td><strong>2</strong></td>
+              <td>Harness runtime metadata</td>
+              <td>Partially done</td>
+              <td>No formal stage registry, owner metadata, or stage retry model.</td>
+            </tr>
+            <tr>
+              <td><strong>3</strong></td>
+              <td>Finance correctness</td>
+              <td>Mostly not done</td>
+              <td>Matrix, FX, tax, duplicates: persistence and engines still thin.</td>
+            </tr>
+            <tr>
+              <td><strong>4</strong></td>
+              <td>Flagship demo polish</td>
+              <td>Partially done</td>
+              <td>Seeds, walkthrough copy, deterministic triggers, finance depth.</td>
+            </tr>
+            <tr>
+              <td><strong>5</strong></td>
+              <td>Workflow nuance</td>
+              <td>Mostly not done</td>
+              <td>Four types selectable; per-workflow behavior still shallow.</td>
+            </tr>
+            <tr>
+              <td><strong>6</strong></td>
+              <td>Production roadmap</td>
+              <td>Not started beyond seams</td>
+              <td>Real auth, OCR, connectors, observability, tenancy.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="doc-link">
+        Full layer-by-layer tasks, verification notes, tiered build order, and epics:
+        <a href="./master-plan-repo-status-and-execution-guide.md">master-plan-repo-status-and-execution-guide.md</a>
+        (open in the editor or render as Markdown in your viewer).
+      </p>
     </section>
 
     <section class="panel section">

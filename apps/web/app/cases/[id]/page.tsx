@@ -6,6 +6,7 @@ import {
 } from "@finance-ops/shared";
 import Link from "next/link";
 import { fetchApiJson } from "../../lib/server-api";
+import { ArtifactPreviewDialog } from "./artifact-preview-dialog";
 import { ExportActionForm } from "./export-action-form";
 import { QuestionResponseForm } from "./question-response-form";
 import { RefreshButton } from "./refresh-button";
@@ -285,7 +286,7 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
               {caseDetail.artifacts.map((artifact) => (
                 <div key={artifact.id} className="artifact-block">
                   <div className="split-line">
-                    <strong>{artifact.filename}</strong>
+                    <ArtifactPreviewDialog caseId={caseDetail.id} artifact={artifact} />
                     <span className="inline-status">{artifact.processingStatus}</span>
                   </div>
                   {artifact.uploadedAt ? (

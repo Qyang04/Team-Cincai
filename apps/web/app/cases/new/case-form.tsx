@@ -27,9 +27,36 @@ type SubmissionState =
 
 const defaultFilenames = ["lunch-receipt.jpg", "parking-receipt.jpg"];
 
+function fileKey(file: File): string {
+  return `${file.name}:${file.size}:${file.lastModified}`;
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+  return `${Math.round(bytes / 1024)} KB`;
+}
+
+async function readHttpErrorMessage(response: Response, fallback: string): Promise<string> {
+  try {
+    const body = (await response.json()) as { message?: string | string[] };
+    if (Array.isArray(body.message)) {
+      return body.message.join("; ");
+    }
+    if (typeof body.message === "string" && body.message.trim()) {
+      return body.message;
+    }
+  } catch {
+    /* ignore */
+  }
+  return fallback;
+}
+
 export function CaseForm() {
   const [state, setState] = useState<SubmissionState>({ kind: "idle" });
   const [filenames, setFilenames] = useState<string[]>(defaultFilenames);
+  const [stagedFiles, setStagedFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isPending, startTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -51,9 +78,25 @@ export function CaseForm() {
     });
   }
 
+  function addStagedFiles(files: File[]) {
+    if (!files.length) return;
+    setStagedFiles((current) => {
+      const seen = new Set(current.map(fileKey));
+      const merged = [...current];
+      for (const file of files) {
+        const key = fileKey(file);
+        if (!seen.has(key)) {
+          seen.add(key);
+          merged.push(file);
+        }
+      }
+      return merged;
+    });
+  }
+
   function handleFilesFromList(files: FileList | null | undefined) {
     if (!files || !files.length) return;
-    addFilenames(Array.from(files).map((file) => file.name));
+    addStagedFiles(Array.from(files));
   }
 
   function handleDrop(event: DragEvent<HTMLDivElement>) {
@@ -65,21 +108,26 @@ export function CaseForm() {
   function handlePaste(event: ClipboardEvent<HTMLDivElement>) {
     const items = event.clipboardData?.items;
     if (!items) return;
-    const names: string[] = [];
+    const pasted: File[] = [];
     for (const item of Array.from(items)) {
       const file = item.getAsFile?.();
       if (file) {
-        names.push(file.name || `pasted-${Date.now()}.${item.type.split("/")[1] ?? "bin"}`);
+        pasted.push(file);
       }
     }
-    if (names.length) {
+    if (pasted.length) {
       event.preventDefault();
-      addFilenames(names);
+      addStagedFiles(pasted);
     }
   }
 
   function removeFilename(target: string) {
     setFilenames((current) => current.filter((name) => name !== target));
+  }
+
+  function removeStagedFile(target: File) {
+    const key = fileKey(target);
+    setStagedFiles((current) => current.filter((file) => fileKey(file) !== key));
   }
 
   function handleSubmit(formData: FormData) {
@@ -89,9 +137,14 @@ export function CaseForm() {
     const requesterId = String(formData.get("requesterId") ?? "").trim() || "demo.requester";
     const notes = String(formData.get("notes") ?? "");
     const submittedFilenames = filenames.map((name) => name.trim()).filter(Boolean);
+    const filesToUpload = [...stagedFiles];
 
     startTransition(async () => {
       try {
+        if (!filesToUpload.length && !submittedFilenames.length) {
+          throw new Error("Add at least one file to upload, or enter mock artifact filenames (one per line).");
+        }
+
         const createResponse = await fetch(`${apiBaseUrl}/cases`, {
           method: "POST",
           headers: {
@@ -103,22 +156,50 @@ export function CaseForm() {
         });
 
         if (!createResponse.ok) {
-          throw new Error(`Failed to create case (${createResponse.status}).`);
+          throw new Error(
+            await readHttpErrorMessage(createResponse, `Failed to create case (${createResponse.status}).`),
+          );
         }
 
         const created = createCaseResponseSchema.parse(await createResponse.json());
+
+        const authHeaders = {
+          "x-mock-user-id": requesterId,
+          "x-mock-role": "REQUESTER",
+        } as const;
+
+        for (const file of filesToUpload) {
+          const uploadBody = new FormData();
+          uploadBody.append("file", file);
+          const uploadResponse = await fetch(`${apiBaseUrl}/cases/${created.id}/artifacts/upload`, {
+            method: "POST",
+            headers: { ...authHeaders },
+            body: uploadBody,
+          });
+          if (!uploadResponse.ok) {
+            throw new Error(
+              await readHttpErrorMessage(
+                uploadResponse,
+                `Failed to upload "${file.name}" (${uploadResponse.status}).`,
+              ),
+            );
+          }
+        }
+
         const submitResponse = await fetch(`${apiBaseUrl}/cases/${created.id}/submit`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-mock-user-id": requesterId,
-            "x-mock-role": "REQUESTER",
+            ...authHeaders,
           },
-          body: JSON.stringify({ notes, filenames: submittedFilenames }),
+          body: JSON.stringify({
+            notes,
+            filenames: filesToUpload.length ? [] : submittedFilenames,
+          }),
         });
 
         if (!submitResponse.ok) {
-          throw new Error(`Failed to submit case (${submitResponse.status}).`);
+          throw new Error(await readHttpErrorMessage(submitResponse, `Failed to submit case (${submitResponse.status}).`));
         }
 
         setState({
@@ -167,8 +248,9 @@ export function CaseForm() {
             <div className="dropzone-icon">AI</div>
             <strong>Stage the evidence for this request</strong>
             <p className="muted">
-              Click to pick files, drag and drop them here, or paste (Ctrl+V) a copied file or screenshot. Only the
-              filenames are sent to the backend - the mock storage layer records them as artifacts.
+              Click, drag and drop, or paste (Ctrl+V) real files. Each file is uploaded to the API and stored under{" "}
+              <code>.local-artifacts/</code> on the server (see <code>LOCAL_ARTIFACT_DIR</code>). If you do not add
+              files, you can still use mock-only mode with the filename list below.
             </p>
           </div>
           <input
@@ -183,9 +265,48 @@ export function CaseForm() {
           />
         </div>
 
-        {filenames.length ? (
+        {stagedFiles.length ? (
           <div className="stack-list" style={{ gap: 8 }}>
-            <p className="detail-label">Staged filenames</p>
+            <p className="detail-label">Staged files (full upload on submit)</p>
+            <p className="muted" style={{ margin: 0, fontSize: "0.9rem" }}>
+              While files are listed here, submit sends their bytes to the API. The filename-only box is ignored until you
+              remove every staged file.
+            </p>
+            <div className="split-actions" style={{ flexWrap: "wrap", gap: 8, justifyContent: "flex-start" }}>
+              {stagedFiles.map((file) => (
+                <span
+                  key={fileKey(file)}
+                  className="inline-status"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                >
+                  <code>{file.name}</code>
+                  <span className="muted" style={{ fontSize: "0.85rem" }}>
+                    ({formatFileSize(file.size)})
+                  </span>
+                  <button
+                    type="button"
+                    aria-label={`Remove ${file.name}`}
+                    onClick={() => removeStagedFile(file)}
+                    style={{
+                      border: "none",
+                      background: "transparent",
+                      cursor: "pointer",
+                      fontSize: "1rem",
+                      lineHeight: 1,
+                      padding: 0,
+                    }}
+                  >
+                    x
+                  </button>
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {!stagedFiles.length && filenames.length ? (
+          <div className="stack-list" style={{ gap: 8 }}>
+            <p className="detail-label">Mock artifact names (no binary upload)</p>
             <div className="split-actions" style={{ flexWrap: "wrap", gap: 8, justifyContent: "flex-start" }}>
               {filenames.map((name) => (
                 <span
@@ -255,7 +376,7 @@ export function CaseForm() {
         </label>
 
         <label className="field">
-          <span className="field-label">Artifact filenames (editable)</span>
+          <span className="field-label">Mock-only filenames (one per line, when no files staged)</span>
           <textarea
             rows={4}
             value={filenames.join("\n")}
@@ -268,7 +389,8 @@ export function CaseForm() {
               )
             }
             className="field-control field-control-mono"
-            placeholder="one filename per line - or drop / paste files above"
+            placeholder="Used only if you submit without staging files above"
+            disabled={stagedFiles.length > 0}
             suppressHydrationWarning
           />
         </label>
@@ -290,6 +412,7 @@ export function CaseForm() {
           onClick={() => {
             setState({ kind: "idle" });
             setFilenames(defaultFilenames);
+            setStagedFiles([]);
             router.refresh();
           }}
         >

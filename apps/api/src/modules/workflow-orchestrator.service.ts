@@ -107,16 +107,34 @@ export class WorkflowOrchestratorService {
       return { error: "Case not found" } as const;
     }
 
-    const createdArtifacts = await this.artifactsService.attachMany(caseId, input.filenames, {
-      storagePrefix: "mock://artifacts",
-      processingStatus: "UPLOADED",
-    });
+    let filenamesForIntake: string[];
 
-    await Promise.all(
-      createdArtifacts.map((artifact: { id: string; storageUri?: string | null }) =>
-        this.processArtifactUpload(caseId, artifact.id, artifact.storageUri ?? undefined),
-      ),
-    );
+    if (input.filenames.length > 0) {
+      const createdArtifacts = await this.artifactsService.attachMany(caseId, input.filenames, {
+        storagePrefix: "mock://artifacts",
+        processingStatus: "UPLOADED",
+      });
+
+      await Promise.all(
+        createdArtifacts.map((artifact: { id: string; storageUri?: string | null }) =>
+          this.processArtifactUpload(caseId, artifact.id, artifact.storageUri ?? undefined),
+        ),
+      );
+
+      filenamesForIntake = input.filenames;
+    } else {
+      const existingArtifacts = await this.artifactsService.listForCase(caseId);
+      const ready = existingArtifacts.filter(
+        (artifact) => artifact.processingStatus === "PROCESSED" || artifact.processingStatus === "UPLOADED",
+      );
+      if (!ready.length) {
+        return {
+          error:
+            "No artifacts to submit: add files using the upload control, or provide at least one filename for mock-only artifacts.",
+        } as const;
+      }
+      filenamesForIntake = ready.map((artifact) => artifact.filename);
+    }
 
     await this.workflowService.transitionCase({
       caseId,
@@ -145,7 +163,7 @@ export class WorkflowOrchestratorService {
         caseId,
         workflowType: existing.workflowType,
         notes: input.notes,
-        filenames: input.filenames,
+        filenames: filenamesForIntake,
       },
     );
 
@@ -163,7 +181,7 @@ export class WorkflowOrchestratorService {
       actorType: "SYSTEM",
       payload: {
         notes: input.notes ?? null,
-        filenames: input.filenames,
+        filenames: filenamesForIntake,
         extraction: aiResult.extraction,
         decision: aiResult.decision,
       },
