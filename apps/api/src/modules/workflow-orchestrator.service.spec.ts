@@ -243,6 +243,135 @@ test("WorkflowOrchestratorService returns clarification state when AI intake nee
   assert.equal(harness.auditEvents[harness.auditEvents.length - 1]?.eventType, "AI_INTAKE_ANALYZED");
 });
 
+test("WorkflowOrchestratorService re-ingests intake and re-runs policy after a retry on a POLICY_REVIEW case", async () => {
+  const harness = createWorkflowOrchestratorHarness();
+  harness.setCurrentStatus("POLICY_REVIEW");
+
+  const artifactsService = harness.service["artifactsService"] as {
+    listForCase: (caseId: string) => Promise<Array<Record<string, unknown>>>;
+    getArtifact: (artifactId: string) => Promise<Record<string, unknown>>;
+    markUploaded: (...args: unknown[]) => Promise<unknown>;
+  };
+  artifactsService.listForCase = async () => [
+    {
+      id: "artifact-1",
+      caseId: "case-1",
+      filename: "receipt.jpg",
+      mimeType: "image/jpeg",
+      source: "upload",
+      extractedText: "Receipt RM 85.50 OPS-12",
+      processingStatus: "PROCESSED",
+      checksum: "abc",
+      metadata: { extractionMethod: "OCR_IMAGE" },
+    },
+  ];
+
+  const intakeService = harness.service["intakeService"] as {
+    persistIntakeResult: (...args: unknown[]) => Promise<unknown>;
+    getLatestExtraction?: (caseId: string) => Promise<unknown>;
+    listQuestions?: (caseId: string) => Promise<unknown[]>;
+  };
+  let latestExtractionId = "extraction-prior";
+  let latestDigest: string | undefined;
+  intakeService.getLatestExtraction = async () => ({
+    id: latestExtractionId,
+    modelMetadata: latestDigest ? { evidenceDigest: latestDigest } : null,
+  });
+  const originalPersist = intakeService.persistIntakeResult.bind(intakeService);
+  intakeService.persistIntakeResult = (async (...args: unknown[]) => {
+    const extraction = args[1] as Record<string, unknown>;
+    latestExtractionId = "extraction-new";
+    const meta = (extraction.modelMetadata as Record<string, unknown> | undefined) ?? {};
+    if (typeof meta.evidenceDigest === "string") {
+      latestDigest = meta.evidenceDigest;
+    }
+    return originalPersist(...args);
+  }) as (...args: unknown[]) => Promise<unknown>;
+  intakeService.listQuestions = async () => [];
+
+  await harness.service.processArtifactUpload("case-1", "artifact-1", "mock://artifacts/artifact-1.jpg");
+
+  assert.equal(
+    harness.persistedIntakeResults.length,
+    1,
+    "retry should persist a fresh extraction row",
+  );
+  const retryAuditEvent = harness.auditEvents.find(
+    (event) => event.eventType === "ARTIFACT_RETRY_REINGESTED",
+  );
+  assert.ok(retryAuditEvent, "ARTIFACT_RETRY_REINGESTED audit event should be recorded");
+  assert.equal(
+    (retryAuditEvent?.payload as Record<string, unknown>).priorExtractionId,
+    "extraction-prior",
+  );
+  assert.equal(
+    (retryAuditEvent?.payload as Record<string, unknown>).newExtractionId,
+    "extraction-new",
+  );
+  const policyDispatches = harness.dispatchCalls.filter(
+    (call) => call.jobName === "run-policy-and-route",
+  );
+  assert.equal(policyDispatches.length, 1, "policy should be re-routed after retry on POLICY_REVIEW");
+
+  const secondHarnessCall = harness.dispatchCalls.filter(
+    (call) => call.jobName === "analyze-intake",
+  );
+  assert.equal(secondHarnessCall.length, 1, "analyze-intake should be dispatched once for the retry");
+});
+
+test("WorkflowOrchestratorService skips retry re-ingestion when evidence text is byte-equal", async () => {
+  const harness = createWorkflowOrchestratorHarness();
+  harness.setCurrentStatus("POLICY_REVIEW");
+
+  const artifactsService = harness.service["artifactsService"] as {
+    listForCase: (caseId: string) => Promise<Array<Record<string, unknown>>>;
+  };
+  artifactsService.listForCase = async () => [
+    {
+      id: "artifact-1",
+      filename: "receipt.jpg",
+      extractedText: "same text",
+      processingStatus: "PROCESSED",
+      checksum: "abc",
+      metadata: null,
+    },
+  ];
+
+  const priorDigest = (harness.service as unknown as {
+    computeEvidenceDigest: (artifacts: unknown[]) => string;
+  }).computeEvidenceDigest([
+    {
+      id: "artifact-1",
+      filename: "receipt.jpg",
+      extractedText: "same text",
+      processingStatus: "PROCESSED",
+      checksum: "abc",
+      metadata: null,
+    },
+  ]);
+
+  const intakeService = harness.service["intakeService"] as {
+    persistIntakeResult: (...args: unknown[]) => Promise<unknown>;
+    getLatestExtraction?: (caseId: string) => Promise<unknown>;
+    listQuestions?: (caseId: string) => Promise<unknown[]>;
+  };
+  intakeService.getLatestExtraction = async () => ({
+    id: "extraction-prior",
+    modelMetadata: { evidenceDigest: priorDigest },
+  });
+  intakeService.listQuestions = async () => [];
+
+  await harness.service.processArtifactUpload("case-1", "artifact-1", "mock://artifacts/artifact-1.jpg");
+
+  assert.equal(harness.persistedIntakeResults.length, 0, "should not persist when evidence is unchanged");
+  const analyzeCalls = harness.dispatchCalls.filter((call) => call.jobName === "analyze-intake");
+  assert.equal(analyzeCalls.length, 0, "should not re-dispatch analyze when digest matches");
+  const retryAuditEvent = harness.auditEvents.find(
+    (event) => event.eventType === "ARTIFACT_RETRY_REINGESTED",
+  );
+  assert.equal(retryAuditEvent, undefined, "no retry audit event when digest matches");
+});
+
 test("WorkflowOrchestratorService recovers recoverable exceptions by re-entering policy routing", async () => {
   const harness = createWorkflowOrchestratorHarness();
   harness.setCurrentStatus("RECOVERABLE_EXCEPTION");

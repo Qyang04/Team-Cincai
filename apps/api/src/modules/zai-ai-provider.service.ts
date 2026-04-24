@@ -119,7 +119,7 @@ export class ZaiAiProviderService {
         {
           role: "system",
           content:
-            "You extract structured finance workflow data from notes plus artifact evidence. Return strict JSON with keys extraction and decision only. extraction must contain fields, confidence, provenance, openQuestions, and optional modelMetadata.",
+            "You extract structured finance workflow data from notes plus artifact evidence. Return strict JSON with keys extraction and decision only. extraction must contain fields, confidence, provenance, openQuestions, and optional modelMetadata. If an artifact's extractedText is empty, whitespace-only, or its metadata.extractionWarnings array is non-empty, do NOT invent values for that artifact's fields: add a clarifying entry to openQuestions asking the requester to re-upload a clearer copy or confirm the values, lower the overall confidence, and omit fields you cannot ground in evidence rather than guessing.",
         },
         {
           role: "user",
