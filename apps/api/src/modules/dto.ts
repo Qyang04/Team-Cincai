@@ -26,7 +26,20 @@ export const delegateApprovalSchema = z.object({
 
 export const financeDecisionSchema = z.object({
   reviewerId: z.string().min(1),
+  ownerId: z.string().min(1).optional(),
+  reasonCategory: z
+    .enum(["POLICY_BLOCK", "RECONCILIATION", "CODING", "RISK", "MISSING_SUPPORT", "OTHER"])
+    .optional(),
+  codingDecision: z.enum(["APPROVE_AS_IS", "RECLASSIFY", "SPLIT", "HOLD"]).optional(),
+  reconciliationStatus: z.enum(["MATCHED", "ADJUSTED", "UNRESOLVED"]).optional(),
+  reconciledAmount: z.number().nonnegative().optional(),
+  reconciledCurrency: z.string().max(16).optional(),
+  annotation: z.string().max(2000).optional(),
   note: z.string().max(2000).optional(),
+});
+
+export const financeAssignSchema = z.object({
+  ownerId: z.string().min(1),
 });
 
 export const prepareUploadSchema = z.object({

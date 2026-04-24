@@ -201,7 +201,14 @@ model FinanceReview {
   id          String   @id @default(uuid())
   caseId       String
   reviewerId   String?
+  ownerId      String?
   outcome      String?
+  reasonCategory String?
+  codingDecision String?
+  reconciliationStatus String?
+  reconciledAmount Float?
+  reconciledCurrency String?
+  annotation   String?
   note         String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt

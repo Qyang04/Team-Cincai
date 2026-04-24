@@ -170,6 +170,35 @@ function createCasesControllerHarness(options?: {
         });
         return review;
       },
+      resolveWithDetails: async (input: {
+        reviewId: string;
+        reviewerId: string;
+        outcome: string;
+        note?: string;
+      }) => {
+        const review = options?.financeReviewRecord ?? {
+          id: input.reviewId,
+          caseId: "case-1",
+          reviewerId: input.reviewerId,
+          outcome: input.outcome,
+          note: input.note,
+        };
+        resolvedReviews.push({
+          reviewId: input.reviewId,
+          reviewerId: input.reviewerId,
+          outcome: input.outcome,
+          note: input.note,
+        });
+        return review;
+      },
+      assignOwner: async (reviewId: string, ownerId: string) => ({
+        id: reviewId,
+        caseId: "case-1",
+        ownerId,
+        outcome: null,
+        reviewerId: null,
+        note: null,
+      }),
     } as never,
     { ensureExportReady: async () => undefined, getLatest: async () => undefined } as never,
     { prepareUpload: async () => undefined } as never,

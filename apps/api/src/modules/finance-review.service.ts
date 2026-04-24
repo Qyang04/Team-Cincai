@@ -37,7 +37,16 @@ export class FinanceReviewService {
         id: review.id,
         caseId: review.caseId,
         reviewerId: review.reviewerId,
+        ...(review.ownerId ? { ownerId: review.ownerId } : {}),
         outcome: review.outcome,
+        ...(review.reasonCategory ? { reasonCategory: review.reasonCategory } : {}),
+        ...(review.codingDecision ? { codingDecision: review.codingDecision } : {}),
+        ...(review.reconciliationStatus ? { reconciliationStatus: review.reconciliationStatus } : {}),
+        ...(review.reconciledAmount !== null && review.reconciledAmount !== undefined
+          ? { reconciledAmount: review.reconciledAmount }
+          : {}),
+        ...(review.reconciledCurrency ? { reconciledCurrency: review.reconciledCurrency } : {}),
+        ...(review.annotation ? { annotation: review.annotation } : {}),
         note: review.note,
         createdAt: toIsoDateTimeString(review.createdAt),
         updatedAt: toIsoDateTimeString(review.updatedAt),
@@ -59,9 +68,48 @@ export class FinanceReviewService {
       where: { id: reviewId },
       data: {
         reviewerId,
+        ownerId: reviewerId,
         outcome,
+        ...(note ? { annotation: note } : {}),
         note,
       },
+    });
+  }
+
+  async resolveWithDetails(input: {
+    reviewId: string;
+    reviewerId: string;
+    outcome: string;
+    ownerId?: string;
+    reasonCategory?: string;
+    codingDecision?: string;
+    reconciliationStatus?: string;
+    reconciledAmount?: number;
+    reconciledCurrency?: string;
+    annotation?: string;
+    note?: string;
+  }) {
+    return this.prisma.financeReview.update({
+      where: { id: input.reviewId },
+      data: {
+        reviewerId: input.reviewerId,
+        ownerId: input.ownerId ?? input.reviewerId,
+        outcome: input.outcome,
+        reasonCategory: input.reasonCategory,
+        codingDecision: input.codingDecision,
+        reconciliationStatus: input.reconciliationStatus,
+        reconciledAmount: input.reconciledAmount,
+        reconciledCurrency: input.reconciledCurrency,
+        annotation: input.annotation,
+        note: input.note,
+      },
+    });
+  }
+
+  async assignOwner(reviewId: string, ownerId: string) {
+    return this.prisma.financeReview.update({
+      where: { id: reviewId },
+      data: { ownerId },
     });
   }
 

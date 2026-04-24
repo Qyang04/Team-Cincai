@@ -98,7 +98,35 @@ export default async function FinanceReviewPage() {
                   <p className="detail-label">Assigned reviewer</p>
                   <p>{review.reviewerId ?? "Unassigned"}</p>
                 </div>
+                <div>
+                  <p className="detail-label">Work owner</p>
+                  <p>{review.ownerId ?? "Unassigned"}</p>
+                </div>
+                <div>
+                  <p className="detail-label">Reason category</p>
+                  <p>{review.reasonCategory ?? "Not categorized"}</p>
+                </div>
+                <div>
+                  <p className="detail-label">Coding decision</p>
+                  <p>{review.codingDecision ?? "No decision"}</p>
+                </div>
+                <div>
+                  <p className="detail-label">Reconciliation</p>
+                  <p>
+                    {review.reconciliationStatus ?? "Not set"}
+                    {review.reconciledAmount !== undefined && review.reconciledAmount !== null
+                      ? ` | ${review.reconciledAmount}${review.reconciledCurrency ? ` ${review.reconciledCurrency}` : ""}`
+                      : ""}
+                  </p>
+                </div>
               </div>
+
+              {review.annotation ? (
+                <div className="notice">
+                  <p className="detail-label">Finance annotation</p>
+                  <p className="muted">{review.annotation}</p>
+                </div>
+              ) : null}
 
               <div className="split-actions" style={{ marginTop: 8 }}>
                 <Link className="button-secondary" href={`/cases/${review.case.id}`}>

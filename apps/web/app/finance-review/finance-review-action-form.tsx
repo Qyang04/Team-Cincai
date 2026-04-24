@@ -6,7 +6,7 @@ import { useState, useTransition } from "react";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
 
-type Mode = "approve" | "reject" | "send-back";
+type Mode = "approve" | "reject" | "send-back" | "assign";
 
 type Feedback = { kind: "success"; message: string } | { kind: "error"; message: string } | null;
 
@@ -22,9 +22,22 @@ export function FinanceReviewActionForm({ reviewId }: { reviewId: string }) {
 
     const reviewerId = String(formData.get("reviewerId") ?? "finance.reviewer").trim() || "finance.reviewer";
     const note = String(formData.get("note") ?? "").trim();
+    const ownerId = String(formData.get("ownerId") ?? "").trim();
+    const reasonCategory = String(formData.get("reasonCategory") ?? "").trim();
+    const codingDecision = String(formData.get("codingDecision") ?? "").trim();
+    const reconciliationStatus = String(formData.get("reconciliationStatus") ?? "").trim();
+    const reconciledAmountRaw = String(formData.get("reconciledAmount") ?? "").trim();
+    const reconciledAmount = reconciledAmountRaw.length ? Number(reconciledAmountRaw) : undefined;
+    const reconciledCurrency = String(formData.get("reconciledCurrency") ?? "").trim();
+    const annotation = String(formData.get("annotation") ?? "").trim();
 
     if (mode === "send-back" && !note) {
       setFeedback({ kind: "error", message: "Explain what information is still needed before sending back." });
+      setPendingMode(null);
+      return;
+    }
+    if (mode === "assign" && !ownerId) {
+      setFeedback({ kind: "error", message: "Provide an owner ID before assigning." });
       setPendingMode(null);
       return;
     }
@@ -38,7 +51,22 @@ export function FinanceReviewActionForm({ reviewId }: { reviewId: string }) {
             "x-mock-role": "FINANCE_REVIEWER",
             "x-mock-user-id": reviewerId,
           },
-          body: JSON.stringify({ reviewerId, note: note || undefined }),
+          body: JSON.stringify(
+            mode === "assign"
+              ? { ownerId }
+              : {
+                  reviewerId,
+                  ownerId: ownerId || undefined,
+                  reasonCategory: reasonCategory || undefined,
+                  codingDecision: codingDecision || undefined,
+                  reconciliationStatus: reconciliationStatus || undefined,
+                  reconciledAmount:
+                    reconciledAmount !== undefined && Number.isFinite(reconciledAmount) ? reconciledAmount : undefined,
+                  reconciledCurrency: reconciledCurrency || undefined,
+                  annotation: annotation || undefined,
+                  note: note || undefined,
+                },
+          ),
         });
 
         if (!response.ok) {
@@ -50,6 +78,9 @@ export function FinanceReviewActionForm({ reviewId }: { reviewId: string }) {
         }
 
         const successMessage =
+          mode === "assign"
+            ? "Assigned. Review ownership updated."
+            :
           mode === "approve"
             ? "Approved. Case moved toward export-ready."
             : mode === "reject"
@@ -86,6 +117,67 @@ export function FinanceReviewActionForm({ reviewId }: { reviewId: string }) {
       </label>
 
       <label className="field">
+        <span className="field-label">Owner (work assignment)</span>
+        <input name="ownerId" defaultValue="finance.reviewer" className="field-control" suppressHydrationWarning />
+      </label>
+
+      <label className="field">
+        <span className="field-label">Reason category</span>
+        <select name="reasonCategory" className="field-control" defaultValue="">
+          <option value="">Select category</option>
+          <option value="POLICY_BLOCK">Policy block</option>
+          <option value="RECONCILIATION">Reconciliation</option>
+          <option value="CODING">Coding</option>
+          <option value="RISK">Risk</option>
+          <option value="MISSING_SUPPORT">Missing support</option>
+          <option value="OTHER">Other</option>
+        </select>
+      </label>
+
+      <label className="field">
+        <span className="field-label">Coding decision</span>
+        <select name="codingDecision" className="field-control" defaultValue="">
+          <option value="">No coding decision</option>
+          <option value="APPROVE_AS_IS">Approve as-is</option>
+          <option value="RECLASSIFY">Reclassify</option>
+          <option value="SPLIT">Split entry</option>
+          <option value="HOLD">Hold</option>
+        </select>
+      </label>
+
+      <div className="field-grid">
+        <label className="field">
+          <span className="field-label">Reconciliation status</span>
+          <select name="reconciliationStatus" className="field-control" defaultValue="">
+            <option value="">No reconciliation decision</option>
+            <option value="MATCHED">Matched</option>
+            <option value="ADJUSTED">Adjusted</option>
+            <option value="UNRESOLVED">Unresolved</option>
+          </select>
+        </label>
+        <label className="field">
+          <span className="field-label">Reconciled amount</span>
+          <input name="reconciledAmount" type="number" step="0.01" min={0} className="field-control" />
+        </label>
+      </div>
+
+      <label className="field">
+        <span className="field-label">Reconciled currency</span>
+        <input name="reconciledCurrency" placeholder="MYR" className="field-control" />
+      </label>
+
+      <label className="field">
+        <span className="field-label">Finance annotation</span>
+        <textarea
+          name="annotation"
+          rows={2}
+          placeholder="Capture finance-specific notes (coding intent, reconciliation evidence, risk context)."
+          className="field-control"
+          suppressHydrationWarning
+        />
+      </label>
+
+      <label className="field">
         <span className="field-label">Review note</span>
         <textarea
           name="note"
@@ -97,6 +189,15 @@ export function FinanceReviewActionForm({ reviewId }: { reviewId: string }) {
       </label>
 
       <div className="split-actions">
+        <button
+          type="button"
+          className="button-secondary"
+          disabled={isPending}
+          onClick={(event) => submit("assign", new FormData(event.currentTarget.form ?? undefined))}
+          suppressHydrationWarning
+        >
+          {isPending && pendingMode === "assign" ? "Assigning..." : "Assign owner"}
+        </button>
         <button
           type="button"
           className="button-primary"

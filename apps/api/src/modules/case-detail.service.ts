@@ -304,7 +304,20 @@ export class CaseDetailService {
             id: latestFinanceReview.id,
             caseId: latestFinanceReview.caseId,
             reviewerId: latestFinanceReview.reviewerId,
+            ...(latestFinanceReview.ownerId ? { ownerId: latestFinanceReview.ownerId } : {}),
             outcome: latestFinanceReview.outcome,
+            ...(latestFinanceReview.reasonCategory ? { reasonCategory: latestFinanceReview.reasonCategory } : {}),
+            ...(latestFinanceReview.codingDecision ? { codingDecision: latestFinanceReview.codingDecision } : {}),
+            ...(latestFinanceReview.reconciliationStatus
+              ? { reconciliationStatus: latestFinanceReview.reconciliationStatus }
+              : {}),
+            ...(latestFinanceReview.reconciledAmount !== null && latestFinanceReview.reconciledAmount !== undefined
+              ? { reconciledAmount: latestFinanceReview.reconciledAmount }
+              : {}),
+            ...(latestFinanceReview.reconciledCurrency
+              ? { reconciledCurrency: latestFinanceReview.reconciledCurrency }
+              : {}),
+            ...(latestFinanceReview.annotation ? { annotation: latestFinanceReview.annotation } : {}),
             note: latestFinanceReview.note,
             createdAt: toIsoDateTimeString(latestFinanceReview.createdAt),
             updatedAt: toIsoDateTimeString(latestFinanceReview.updatedAt),
@@ -399,7 +412,16 @@ export class CaseDetailService {
         id: review.id,
         caseId: review.caseId,
         reviewerId: review.reviewerId,
+        ...(review.ownerId ? { ownerId: review.ownerId } : {}),
         outcome: review.outcome,
+        ...(review.reasonCategory ? { reasonCategory: review.reasonCategory } : {}),
+        ...(review.codingDecision ? { codingDecision: review.codingDecision } : {}),
+        ...(review.reconciliationStatus ? { reconciliationStatus: review.reconciliationStatus } : {}),
+        ...(review.reconciledAmount !== null && review.reconciledAmount !== undefined
+          ? { reconciledAmount: review.reconciledAmount }
+          : {}),
+        ...(review.reconciledCurrency ? { reconciledCurrency: review.reconciledCurrency } : {}),
+        ...(review.annotation ? { annotation: review.annotation } : {}),
         note: review.note,
         createdAt: toIsoDateTimeString(review.createdAt),
         updatedAt: toIsoDateTimeString(review.updatedAt),

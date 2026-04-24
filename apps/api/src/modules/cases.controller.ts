@@ -41,6 +41,7 @@ import {
   completeArtifactUploadSchema,
   delegateApprovalSchema,
   financeDecisionSchema,
+  financeAssignSchema,
   prepareUploadSchema,
   processArtifactSchema,
   requestInfoSchema,
@@ -91,14 +92,28 @@ function toFinanceReviewResolution(input: {
   id: string;
   caseId: string;
   reviewerId?: string | null;
+  ownerId?: string | null;
   outcome?: string | null;
+  reasonCategory?: string | null;
+  codingDecision?: string | null;
+  reconciliationStatus?: string | null;
+  reconciledAmount?: number | null;
+  reconciledCurrency?: string | null;
+  annotation?: string | null;
   note?: string | null;
 }) {
   return {
     id: input.id,
     caseId: input.caseId,
     reviewerId: input.reviewerId ?? null,
+    ownerId: input.ownerId ?? null,
     outcome: input.outcome ?? null,
+    reasonCategory: input.reasonCategory ?? null,
+    codingDecision: input.codingDecision ?? null,
+    reconciliationStatus: input.reconciliationStatus ?? null,
+    reconciledAmount: input.reconciledAmount ?? null,
+    reconciledCurrency: input.reconciledCurrency ?? null,
+    annotation: input.annotation ?? null,
     note: input.note ?? null,
   };
 }
@@ -671,13 +686,33 @@ export class CasesController {
   async approveFinanceReview(
     @Param("reviewId") reviewId: string,
     @CurrentUser() user: AuthenticatedUser,
-    @Body() body: { note?: string },
+    @Body() body: unknown,
   ): Promise<FinanceReviewActionResponse> {
+    const parsedBody = body as Record<string, unknown>;
     const input = financeDecisionSchema.parse({
       reviewerId: user.id,
-      note: body.note,
+      ownerId: typeof parsedBody.ownerId === "string" ? parsedBody.ownerId : undefined,
+      reasonCategory: typeof parsedBody.reasonCategory === "string" ? parsedBody.reasonCategory : undefined,
+      codingDecision: typeof parsedBody.codingDecision === "string" ? parsedBody.codingDecision : undefined,
+      reconciliationStatus: typeof parsedBody.reconciliationStatus === "string" ? parsedBody.reconciliationStatus : undefined,
+      reconciledAmount: typeof parsedBody.reconciledAmount === "number" ? parsedBody.reconciledAmount : undefined,
+      reconciledCurrency: typeof parsedBody.reconciledCurrency === "string" ? parsedBody.reconciledCurrency : undefined,
+      annotation: typeof parsedBody.annotation === "string" ? parsedBody.annotation : undefined,
+      note: typeof parsedBody.note === "string" ? parsedBody.note : undefined,
     });
-    const review = await this.financeReviewService.resolve(reviewId, input.reviewerId, "APPROVED", input.note);
+    const review = await this.financeReviewService.resolveWithDetails({
+      reviewId,
+      reviewerId: input.reviewerId,
+      outcome: "APPROVED",
+      ownerId: input.ownerId,
+      reasonCategory: input.reasonCategory,
+      codingDecision: input.codingDecision,
+      reconciliationStatus: input.reconciliationStatus,
+      reconciledAmount: input.reconciledAmount,
+      reconciledCurrency: input.reconciledCurrency,
+      annotation: input.annotation,
+      note: input.note,
+    });
     await this.workflowService.transitionCase({
       caseId: review.caseId,
       from: "FINANCE_REVIEW",
@@ -709,13 +744,33 @@ export class CasesController {
   async rejectFinanceReview(
     @Param("reviewId") reviewId: string,
     @CurrentUser() user: AuthenticatedUser,
-    @Body() body: { note?: string },
+    @Body() body: unknown,
   ): Promise<FinanceReviewActionResponse> {
+    const parsedBody = body as Record<string, unknown>;
     const input = financeDecisionSchema.parse({
       reviewerId: user.id,
-      note: body.note,
+      ownerId: typeof parsedBody.ownerId === "string" ? parsedBody.ownerId : undefined,
+      reasonCategory: typeof parsedBody.reasonCategory === "string" ? parsedBody.reasonCategory : undefined,
+      codingDecision: typeof parsedBody.codingDecision === "string" ? parsedBody.codingDecision : undefined,
+      reconciliationStatus: typeof parsedBody.reconciliationStatus === "string" ? parsedBody.reconciliationStatus : undefined,
+      reconciledAmount: typeof parsedBody.reconciledAmount === "number" ? parsedBody.reconciledAmount : undefined,
+      reconciledCurrency: typeof parsedBody.reconciledCurrency === "string" ? parsedBody.reconciledCurrency : undefined,
+      annotation: typeof parsedBody.annotation === "string" ? parsedBody.annotation : undefined,
+      note: typeof parsedBody.note === "string" ? parsedBody.note : undefined,
     });
-    const review = await this.financeReviewService.resolve(reviewId, input.reviewerId, "REJECTED", input.note);
+    const review = await this.financeReviewService.resolveWithDetails({
+      reviewId,
+      reviewerId: input.reviewerId,
+      outcome: "REJECTED",
+      ownerId: input.ownerId,
+      reasonCategory: input.reasonCategory,
+      codingDecision: input.codingDecision,
+      reconciliationStatus: input.reconciliationStatus,
+      reconciledAmount: input.reconciledAmount,
+      reconciledCurrency: input.reconciledCurrency,
+      annotation: input.annotation,
+      note: input.note,
+    });
     const rejected = await this.workflowService.transitionCase({
       caseId: review.caseId,
       from: "FINANCE_REVIEW",
@@ -738,13 +793,33 @@ export class CasesController {
   async sendBackFinanceReview(
     @Param("reviewId") reviewId: string,
     @CurrentUser() user: AuthenticatedUser,
-    @Body() body: { note?: string },
+    @Body() body: unknown,
   ): Promise<FinanceReviewActionResponse> {
+    const parsedBody = body as Record<string, unknown>;
     const input = financeDecisionSchema.parse({
       reviewerId: user.id,
-      note: body.note,
+      ownerId: typeof parsedBody.ownerId === "string" ? parsedBody.ownerId : undefined,
+      reasonCategory: typeof parsedBody.reasonCategory === "string" ? parsedBody.reasonCategory : undefined,
+      codingDecision: typeof parsedBody.codingDecision === "string" ? parsedBody.codingDecision : undefined,
+      reconciliationStatus: typeof parsedBody.reconciliationStatus === "string" ? parsedBody.reconciliationStatus : undefined,
+      reconciledAmount: typeof parsedBody.reconciledAmount === "number" ? parsedBody.reconciledAmount : undefined,
+      reconciledCurrency: typeof parsedBody.reconciledCurrency === "string" ? parsedBody.reconciledCurrency : undefined,
+      annotation: typeof parsedBody.annotation === "string" ? parsedBody.annotation : undefined,
+      note: typeof parsedBody.note === "string" ? parsedBody.note : undefined,
     });
-    const review = await this.financeReviewService.resolve(reviewId, input.reviewerId, "SENT_BACK", input.note);
+    const review = await this.financeReviewService.resolveWithDetails({
+      reviewId,
+      reviewerId: input.reviewerId,
+      outcome: "SENT_BACK",
+      ownerId: input.ownerId,
+      reasonCategory: input.reasonCategory,
+      codingDecision: input.codingDecision,
+      reconciliationStatus: input.reconciliationStatus,
+      reconciledAmount: input.reconciledAmount,
+      reconciledCurrency: input.reconciledCurrency,
+      annotation: input.annotation,
+      note: input.note,
+    });
     const updated = await this.workflowService.transitionCase({
       caseId: review.caseId,
       from: "FINANCE_REVIEW",
@@ -759,6 +834,38 @@ export class CasesController {
       data: {
         review: toFinanceReviewResolution(review),
         case: toCaseStatusSnapshot(updated),
+      },
+    };
+  }
+
+  @Post("/finance-review/:reviewId/assign")
+  @Roles("FINANCE_REVIEWER", "ADMIN")
+  async assignFinanceReview(
+    @Param("reviewId") reviewId: string,
+    @Body() body: unknown,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<FinanceReviewActionResponse> {
+    const input = financeAssignSchema.parse(body);
+    const review = await this.financeReviewService.assignOwner(reviewId, input.ownerId);
+    await this.auditService.recordEvent({
+      caseId: review.caseId,
+      eventType: "FINANCE_REVIEW_ASSIGNED",
+      actorType: user.roles.includes("ADMIN") ? "ADMIN" : "FINANCE_REVIEWER",
+      actorId: user.id,
+      payload: {
+        reviewId,
+        ownerId: input.ownerId,
+      },
+    });
+    const caseRecord = await this.casesService.getCase(review.caseId);
+    return {
+      success: true,
+      data: {
+        review: toFinanceReviewResolution(review),
+        case: toCaseStatusSnapshot({
+          id: review.caseId,
+          status: (caseRecord?.status ?? "FINANCE_REVIEW") as CaseStatus,
+        }),
       },
     };
   }
