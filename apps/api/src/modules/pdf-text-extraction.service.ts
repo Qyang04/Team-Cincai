@@ -1,9 +1,31 @@
 import { Injectable } from "@nestjs/common";
 
-let pdfjsLoader: Promise<typeof import("pdfjs-dist/legacy/build/pdf.mjs")> | null = null;
+type PdfTextContentItem = {
+  str?: string;
+};
+
+type PdfPageProxyLike = {
+  getTextContent(): Promise<{
+    items: PdfTextContentItem[];
+  }>;
+};
+
+type PdfDocumentProxyLike = {
+  numPages: number;
+  getPage(pageNumber: number): Promise<PdfPageProxyLike>;
+  destroy(): Promise<void>;
+};
+
+type PdfJsModuleLike = {
+  getDocument(input: { data: Uint8Array }): {
+    promise: Promise<PdfDocumentProxyLike>;
+  };
+};
+
+let pdfjsLoader: Promise<PdfJsModuleLike> | null = null;
 const dynamicImport = new Function("specifier", "return import(specifier)") as (
   specifier: string,
-) => Promise<typeof import("pdfjs-dist/legacy/build/pdf.mjs")>;
+) => Promise<unknown>;
 
 function normalizePdfText(value: string): string {
   return value
@@ -14,7 +36,7 @@ function normalizePdfText(value: string): string {
 }
 
 async function loadPdfJs() {
-  pdfjsLoader ??= dynamicImport("pdfjs-dist/legacy/build/pdf.mjs");
+  pdfjsLoader ??= dynamicImport("pdfjs-dist/legacy/build/pdf.mjs").then((module) => module as PdfJsModuleLike);
   return pdfjsLoader;
 }
 
@@ -30,7 +52,7 @@ export class PdfTextExtractionService {
       for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
         const page = await document.getPage(pageNumber);
         const content = await page.getTextContent();
-        const text = normalizePdfText(content.items.map((item) => ("str" in item ? item.str : "")).join(" "));
+        const text = normalizePdfText(content.items.map((item: PdfTextContentItem) => item.str ?? "").join(" "));
 
         if (text) {
           pageTexts.push(text);
