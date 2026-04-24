@@ -861,6 +861,106 @@ textarea {
   gap: 18px;
 }
 
+.login-role-card {
+  padding: 20px 22px;
+  display: grid;
+  gap: 12px;
+  text-align: left;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+  color: white;
+  cursor: pointer;
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.login-role-card:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.28);
+  box-shadow: 0 18px 28px rgba(0, 0, 0, 0.18);
+}
+
+.login-role-card:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.login-role-card-requester {
+  background: linear-gradient(180deg, rgba(177, 102, 40, 0.28), rgba(104, 58, 22, 0.16));
+}
+
+.login-role-card-approver {
+  background: linear-gradient(180deg, rgba(42, 106, 190, 0.28), rgba(20, 56, 108, 0.16));
+}
+
+.login-role-card-finance {
+  background: linear-gradient(180deg, rgba(22, 132, 92, 0.28), rgba(9, 71, 50, 0.16));
+}
+
+.login-role-card-admin {
+  background: linear-gradient(180deg, rgba(107, 78, 186, 0.28), rgba(55, 38, 103, 0.16));
+}
+
+.login-role-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: start;
+}
+
+.login-role-head strong {
+  font-size: 1.08rem;
+  letter-spacing: -0.03em;
+}
+
+.login-role-copy {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.55;
+}
+
+.login-role-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.login-role-badge-requester {
+  background: rgba(255, 237, 219, 0.92);
+  color: #7a4a17;
+  border-color: rgba(255, 214, 176, 0.65);
+}
+
+.login-role-badge-approver {
+  background: rgba(228, 239, 255, 0.92);
+  color: #1d4f95;
+  border-color: rgba(173, 201, 242, 0.6);
+}
+
+.login-role-badge-finance {
+  background: rgba(225, 247, 239, 0.92);
+  color: #0f6a4a;
+  border-color: rgba(156, 221, 194, 0.6);
+}
+
+.login-role-badge-admin {
+  background: rgba(238, 231, 255, 0.92);
+  color: #5d3da3;
+  border-color: rgba(197, 182, 243, 0.6);
+}
+
 .queue-item-critical {
   background: linear-gradient(180deg, #fff6f5 0%, rgba(255, 255, 255, 0.94) 100%);
 }

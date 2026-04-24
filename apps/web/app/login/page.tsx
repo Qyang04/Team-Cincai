@@ -12,6 +12,45 @@ import { setClientAccessToken } from "../lib/client-session";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
 
+function getRoleCardClass(userId: string): string {
+  if (userId === "demo.requester") {
+    return "login-role-card login-role-card-requester";
+  }
+  if (userId === "manager.approver") {
+    return "login-role-card login-role-card-approver";
+  }
+  if (userId === "finance.reviewer") {
+    return "login-role-card login-role-card-finance";
+  }
+  return "login-role-card login-role-card-admin";
+}
+
+function getRoleBadgeClass(userId: string): string {
+  if (userId === "demo.requester") {
+    return "login-role-badge login-role-badge-requester";
+  }
+  if (userId === "manager.approver") {
+    return "login-role-badge login-role-badge-approver";
+  }
+  if (userId === "finance.reviewer") {
+    return "login-role-badge login-role-badge-finance";
+  }
+  return "login-role-badge login-role-badge-admin";
+}
+
+function getRoleSummary(user: DirectoryUser): string {
+  if (user.id === "demo.requester") {
+    return "Start the demo here: create and submit a case.";
+  }
+  if (user.id === "manager.approver") {
+    return "Review and approve the manager queue.";
+  }
+  if (user.id === "finance.reviewer") {
+    return "Handle finance-review cases when policy escalates.";
+  }
+  return "See every lane and admin configuration in one account.";
+}
+
 export default function LoginPage() {
   const [users, setUsers] = useState<DirectoryUser[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -94,24 +133,15 @@ export default function LoginPage() {
                 <button
                   key={user.id}
                   type="button"
-                  className="queue-item"
+                  className={getRoleCardClass(user.id)}
                   disabled={isPending}
                   onClick={() => signIn(user.id)}
-                  style={{ textAlign: "left" }}
                 >
-                  <strong>{user.displayName}</strong>
-                  <p className="muted">
-                    {user.roles.join(", ")}
-                  </p>
-                  <p className="muted">
-                    {user.id === "demo.requester"
-                      ? "Start the demo here: create and submit a case."
-                      : user.id === "manager.approver"
-                        ? "Review and approve the manager queue."
-                        : user.id === "finance.reviewer"
-                          ? "Handle finance-review cases when policy escalates."
-                          : "See every lane and admin configuration in one account."}
-                  </p>
+                  <div className="login-role-head">
+                    <strong>{user.displayName}</strong>
+                    <span className={getRoleBadgeClass(user.id)}>{user.roles.join(", ")}</span>
+                  </div>
+                  <p className="login-role-copy">{getRoleSummary(user)}</p>
                 </button>
               ))}
             </div>
