@@ -21,8 +21,23 @@ Greenfield implementation scaffold for a finance-operations workflow platform po
 ## Next Steps
 1. Install dependencies with `npm.cmd install`
 2. Start local services with `docker compose up -d`
-3. Implement real auth/storage and queue wiring
-4. Replace mock connectors with production integrations over time
+3. Apply the current Prisma schema to your local database:
+```powershell
+npx prisma db push --schema apps/api/prisma/schema.prisma
+```
+4. Implement real auth/storage and queue wiring
+5. Replace mock connectors with production integrations over time
+
+## Run The API
+Before starting the API for the first time, make sure your database schema has been pushed:
+```powershell
+npx prisma db push --schema apps/api/prisma/schema.prisma
+```
+
+Then start the NestJS API:
+```powershell
+npm.cmd run dev:api
+```
 
 ## Run The Web App
 1. Start the API if you want the web app to load live data. The web app uses `http://localhost:4000/api` by default:
