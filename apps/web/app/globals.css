@@ -1404,6 +1404,50 @@ code {
   gap: 20px;
 }
 
+.ocr-workspace-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+}
+
+.ocr-preview-list {
+  display: grid;
+  gap: 12px;
+}
+
+.ocr-preview-card {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--panel-muted);
+}
+
+.ocr-preview-card img {
+  width: 100%;
+  height: auto;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: white;
+}
+
+.ocr-result-box {
+  min-height: 180px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: #fbfaf7;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ocr-meta-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -1482,7 +1526,8 @@ td {
   .admin-layout,
   .case-overview,
   .support-grid,
-  .split-panel {
+  .split-panel,
+  .ocr-workspace-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -1539,7 +1584,8 @@ td {
   .case-summary-grid,
   .hero-metrics,
   .workflow-track,
-  .field-grid {
+  .field-grid,
+  .ocr-meta-grid {
     grid-template-columns: 1fr;
   }
 

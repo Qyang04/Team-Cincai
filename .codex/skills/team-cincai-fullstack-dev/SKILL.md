@@ -83,6 +83,7 @@ Implement UI work in `apps/web` after backend behavior is stable.
 - Match existing component boundaries before extracting abstractions.
 - Prefer form-driven mutations that post to the API and then refresh or navigate to the relevant case surface.
 - When adding a new screen, connect it to an existing workflow lane and navigation entry instead of creating an isolated demo page.
+- When adding debug tooling in `apps/web`, use a shared `/debug` workspace as the main entry point. Add feature-specific tools there as modules or subroutes instead of creating a feature-specific top-level debug page.
 - Keep empty, loading, and failed API states explicit.
 - If a page consumes backend JSON, parse or type it through `@finance-ops/shared` whenever practical.
 
