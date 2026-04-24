@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { OcrDebugForm } from "./ocr/ocr-debug-form";
+import { PdfTextDebugForm } from "./pdf/pdf-text-debug-form";
 
 const debugModules = [
   {
@@ -7,6 +8,12 @@ const debugModules = [
     status: "Active",
     href: "/debug#ocr-utility",
     copy: "Run Tesseract OCR against uploaded images and inspect the comma-joined result.",
+  },
+  {
+    title: "PDF text extraction",
+    status: "Active",
+    href: "/debug#pdf-text-extraction",
+    copy: "Extract text from uploaded PDFs in the browser and inspect the comma-joined result.",
   },
   {
     title: "Component sandbox",
@@ -95,6 +102,42 @@ export default function DebugPage() {
             <div className="timeline-step">
               <strong>Future-friendly workspace</strong>
               <p className="muted">Additional debug modules should be added here as separate panels or subroutes.</p>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <section id="pdf-text-extraction" className="ocr-workspace-grid">
+        <article className="surface surface-large">
+          <div className="surface-head">
+            <div>
+              <p className="eyebrow">Module: PDF</p>
+              <h2>Extract text from uploaded PDFs</h2>
+            </div>
+            <span className="inline-status">PDF.js</span>
+          </div>
+          <PdfTextDebugForm />
+        </article>
+
+        <aside className="surface">
+          <div className="surface-head">
+            <div>
+              <p className="eyebrow">Module notes</p>
+              <h2>PDF extraction scope</h2>
+            </div>
+          </div>
+          <div className="timeline-list">
+            <div className="timeline-step">
+              <strong>Client-side PDF text pass</strong>
+              <p className="muted">Processes uploaded PDFs in the browser using PDF.js text extraction.</p>
+            </div>
+            <div className="timeline-step">
+              <strong>Joined output contract</strong>
+              <p className="muted">Returns extracted text as a single comma-separated string plus per-file details.</p>
+            </div>
+            <div className="timeline-step">
+              <strong>Clear boundary</strong>
+              <p className="muted">Scanned PDFs still need OCR after page rendering because embedded text may be absent.</p>
             </div>
           </div>
         </aside>
