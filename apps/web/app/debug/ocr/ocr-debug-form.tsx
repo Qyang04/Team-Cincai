@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState, useTransition, type ChangeEvent } from "react";
-import { TesseractOcrService } from "../../lib/ocr";
+import { postDebugFiles } from "../debug-api";
 
 type OcrState =
   | { kind: "idle" }
@@ -16,8 +16,6 @@ type PreviewImage = {
   sizeLabel: string;
   url: string;
 };
-
-const ocrService = new TesseractOcrService();
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) {
@@ -79,11 +77,11 @@ export function OcrDebugForm() {
 
     startTransition(async () => {
       try {
-        const texts = await ocrService.extractStrings(files);
+        const result = await postDebugFiles("ocr", files);
         setState({
           kind: "success",
-          texts,
-          joinedText: texts.join(","),
+          texts: result.texts,
+          joinedText: result.joinedText,
         });
       } catch (error) {
         setState({
@@ -120,8 +118,8 @@ export function OcrDebugForm() {
             <div className="dropzone-icon">OCR</div>
             <strong>Select one or more images</strong>
             <p className="muted">
-              The images stay in your browser session. OCR runs locally using Tesseract and returns a comma-joined text
-              string.
+              The files stay staged in your browser until upload. OCR runs through the API and returns a comma-joined
+              text string.
             </p>
           </div>
           <input
@@ -200,7 +198,7 @@ export function OcrDebugForm() {
 
         <div className="ocr-result-box">
           {state.kind === "idle" ? "Run OCR to display the recognized text here." : null}
-          {state.kind === "running" ? "Tesseract is processing the selected image set..." : null}
+          {state.kind === "running" ? "The API is processing the selected image set..." : null}
           {state.kind === "error" ? state.error : null}
           {state.kind === "success" ? state.joinedText || "No text detected." : null}
         </div>

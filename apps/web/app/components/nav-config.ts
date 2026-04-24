@@ -1,4 +1,5 @@
 import type { SessionUser } from "@finance-ops/shared";
+import { isDebugModeEnabled } from "../lib/debug-mode";
 
 export type NavItem = {
   href: string;
@@ -16,11 +17,14 @@ const PRIMARY_NAV_ITEMS: Array<NavItem & { roles?: SessionUser["roles"][number][
 ];
 
 export function getPrimaryNavItems(user: SessionUser | null): NavItem[] {
+  const debugModeEnabled = isDebugModeEnabled();
+  const visibleItems = PRIMARY_NAV_ITEMS.filter((item) => debugModeEnabled || item.href !== "/debug");
+
   if (!user) {
-    return PRIMARY_NAV_ITEMS.filter((item) => !item.roles);
+    return visibleItems.filter((item) => !item.roles);
   }
 
-  return PRIMARY_NAV_ITEMS.filter((item) => !item.roles || item.roles.some((role) => user.roles.includes(role))).map(
-    ({ href, label }) => ({ href, label }),
-  );
+  return visibleItems
+    .filter((item) => !item.roles || item.roles.some((role) => user.roles.includes(role)))
+    .map(({ href, label }) => ({ href, label }));
 }

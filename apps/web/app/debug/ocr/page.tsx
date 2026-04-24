@@ -1,7 +1,13 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
+import { isDebugModeEnabled } from "../../lib/debug-mode";
 import { OcrDebugForm } from "./ocr-debug-form";
 
 export default function OcrDebugPage() {
+  if (!isDebugModeEnabled()) {
+    notFound();
+  }
+
   return (
     <div className="workspace workspace-tight fade-up">
       <section className="workspace-header">

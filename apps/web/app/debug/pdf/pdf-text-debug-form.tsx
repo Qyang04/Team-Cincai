@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState, useTransition, type ChangeEvent } from "react";
-import { PdfTextExtractionService } from "../../lib/pdf-text-extraction";
+import { postDebugFiles } from "../debug-api";
 
 type PdfExtractionState =
   | { kind: "idle" }
@@ -14,8 +14,6 @@ type PdfPreview = {
   name: string;
   sizeLabel: string;
 };
-
-const pdfTextService = new PdfTextExtractionService();
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) {
@@ -68,11 +66,11 @@ export function PdfTextDebugForm() {
 
     startTransition(async () => {
       try {
-        const texts = await pdfTextService.extractStrings(files);
+        const result = await postDebugFiles("pdf-text", files);
         setState({
           kind: "success",
-          texts,
-          joinedText: texts.join(","),
+          texts: result.texts,
+          joinedText: result.joinedText,
         });
       } catch (error) {
         setState({
@@ -109,7 +107,7 @@ export function PdfTextDebugForm() {
             <div className="dropzone-icon">PDF</div>
             <strong>Select one or more PDF files</strong>
             <p className="muted">
-              Text extraction runs in the browser and returns the detected PDF text as a comma-joined string plus
+              Text extraction runs through the API and returns the detected PDF text as a comma-joined string plus
               per-file details.
             </p>
           </div>
@@ -156,7 +154,7 @@ export function PdfTextDebugForm() {
                 <span className="inline-status">{preview.sizeLabel}</span>
               </div>
               <div className="pdf-debug-card-body">
-                <strong>Ready for browser-side text extraction</strong>
+                <strong>Ready for API-side text extraction</strong>
                 <p className="muted">
                   Use this for text PDFs first. Scanned PDFs may still need OCR after page rendering.
                 </p>
@@ -187,7 +185,7 @@ export function PdfTextDebugForm() {
 
         <div className="ocr-result-box">
           {state.kind === "idle" ? "Run PDF extraction to display the recognized text here." : null}
-          {state.kind === "running" ? "PDF.js is processing the selected PDF set..." : null}
+          {state.kind === "running" ? "The API is processing the selected PDF set..." : null}
           {state.kind === "error" ? state.error : null}
           {state.kind === "success" ? state.joinedText || "No text detected." : null}
         </div>

@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
+import { isDebugModeEnabled } from "../lib/debug-mode";
 import { OcrDebugForm } from "./ocr/ocr-debug-form";
 import { PdfTextDebugForm } from "./pdf/pdf-text-debug-form";
 
@@ -30,6 +32,10 @@ const debugModules = [
 ] as const;
 
 export default function DebugPage() {
+  if (!isDebugModeEnabled()) {
+    notFound();
+  }
+
   return (
     <div className="workspace workspace-tight fade-up">
       <section className="workspace-header">
