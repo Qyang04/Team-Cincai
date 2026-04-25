@@ -23,7 +23,6 @@ import { JobRunnerService } from "./job-runner.service";
 import { LocalArtifactStorageService } from "./local-artifact-storage.service";
 import { CasesService } from "./cases.service";
 import { IntakeService } from "./intake.service";
-import { MockAiProviderService } from "./mock-ai-provider.service";
 import { NotificationsService } from "./notifications.service";
 import { PdfTextExtractionService } from "./pdf-text-extraction.service";
 import { PolicyService } from "./policy.service";
@@ -72,7 +71,6 @@ import { JwtModule } from "@nestjs/jwt";
     WorkflowOrchestratorService,
     WorkflowExecutionService,
     QueueWorkerService,
-    MockAiProviderService,
     ZaiAiProviderService,
     LocalArtifactStorageService,
     StorageService,

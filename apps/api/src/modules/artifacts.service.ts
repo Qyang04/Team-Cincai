@@ -9,6 +9,8 @@ function detectArtifactSource(storageUri?: string): string {
   if (storageUri.startsWith("local://")) {
     return "UPLOAD";
   }
+  // Legacy: `mock://` artifacts are no longer created by submit; this branch only classifies
+  // pre-existing rows so old demo cases still render in the case detail UI.
   if (storageUri.startsWith("mock://")) {
     return "MOCK";
   }

@@ -5,9 +5,9 @@ import {
   workflowDecisionSchema,
   type CaseStatus,
   type ExtractionResult,
+  type IntakeArtifacts,
   type WorkflowDecision,
 } from "@finance-ops/shared";
-import type { IntakeArtifacts } from "./mock-ai-provider.service";
 
 function extractJsonObject(raw: string): string {
   const trimmed = raw.trim();
@@ -165,7 +165,9 @@ export class ZaiAiProviderService {
     decision: WorkflowDecision;
   }> {
     if (!this.client) {
-      throw new Error("Z.AI client is not configured.");
+      throw new Error(
+        "Z.AI client is not configured. Set ZAI_API_KEY (and optionally ZAI_BASE_URL / ZAI_MODEL_PRIMARY) — there is no mock fallback.",
+      );
     }
 
     const response = await this.client.chat.completions.create({

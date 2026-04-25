@@ -50,6 +50,7 @@ export const caseTransitionRules: CaseTransitionRule[] = [
   { from: "SUBMITTED", to: "INTAKE_PROCESSING" },
   { from: "INTAKE_PROCESSING", to: "AWAITING_REQUESTER_INFO" },
   { from: "INTAKE_PROCESSING", to: "POLICY_REVIEW" },
+  { from: "INTAKE_PROCESSING", to: "RECOVERABLE_EXCEPTION" },
   { from: "AWAITING_REQUESTER_INFO", to: "POLICY_REVIEW" },
   { from: "POLICY_REVIEW", to: "AWAITING_APPROVAL" },
   { from: "POLICY_REVIEW", to: "FINANCE_REVIEW" },

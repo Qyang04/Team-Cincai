@@ -5,9 +5,11 @@ import { adminConnectorsResponseSchema, type AdminConnectorStatus } from "@finan
 export class ConnectorHealthService {
   getStatus(): AdminConnectorStatus[] {
     const queueMode = process.env.QUEUE_MODE ?? "inline";
-    const useMockAi = (process.env.USE_MOCK_AI ?? "true").toLowerCase() !== "false";
+    const zaiConfigured = Boolean(process.env.ZAI_API_KEY);
     const useMockAuth = (process.env.USE_MOCK_AUTH ?? "false").toLowerCase() === "true";
-    const useMockStorage = (process.env.USE_MOCK_STORAGE ?? "true").toLowerCase() !== "false";
+    const supabaseConfigured = Boolean(
+      process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY,
+    );
 
     return adminConnectorsResponseSchema.parse([
       {
@@ -17,8 +19,10 @@ export class ConnectorHealthService {
       },
       {
         connector: "Z.AI reasoning",
-        status: useMockAi ? "mock-enabled" : "configured-runtime",
-        detail: useMockAi ? "Mock AI provider is active." : "Live Z.AI provider selected by runtime flags.",
+        status: zaiConfigured ? "configured-runtime" : "missing-credentials",
+        detail: zaiConfigured
+          ? "Live Z.AI provider is the only intake reasoning path."
+          : "ZAI_API_KEY is not set; intake jobs will fail until configured.",
       },
       {
         connector: "Auth",
@@ -29,8 +33,10 @@ export class ConnectorHealthService {
       },
       {
         connector: "Storage",
-        status: useMockStorage ? "mock-enabled" : "supabase-storage",
-        detail: useMockStorage ? "Upload preparation returns mock signed-upload responses." : "Supabase-compatible upload preparation is active.",
+        status: supabaseConfigured ? "supabase-storage" : "local-disk-only",
+        detail: supabaseConfigured
+          ? "Supabase-compatible upload preparation is active for signed URL flows."
+          : "Direct uploads land on the API server's local disk; configure Supabase to enable signed-URL uploads.",
       },
       {
         connector: "Queue execution",

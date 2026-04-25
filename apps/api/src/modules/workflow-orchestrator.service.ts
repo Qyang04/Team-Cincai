@@ -5,6 +5,7 @@ import {
   type CaseStatus,
   type CaseSummary,
   type ExtractionResult,
+  type IntakeArtifactEvidence,
   type PolicyCheckResult,
   type WorkflowDecision,
 } from "@finance-ops/shared";
@@ -30,17 +31,6 @@ type PolicyRouteResult =
 
 type ArtifactProcessResult = Awaited<ReturnType<ArtifactsService["markProcessed"]>>;
 
-type IntakeArtifactEvidence = {
-  id: string;
-  filename: string;
-  mimeType?: string | null;
-  source?: string | null;
-  extractedText?: string | null;
-  processingStatus: string;
-  checksum?: string | null;
-  metadata?: Record<string, unknown> | null;
-};
-
 function hasEmptyExtractedText(artifact: IntakeArtifactEvidence): boolean {
   if (artifact.processingStatus !== "PROCESSED") {
     return false;
@@ -56,7 +46,7 @@ function hasExtractionWarnings(artifact: IntakeArtifactEvidence): boolean {
   if (!metadata || typeof metadata !== "object") {
     return false;
   }
-  const warnings = metadata.extractionWarnings;
+  const warnings = (metadata as Record<string, unknown>).extractionWarnings;
   return Array.isArray(warnings) && warnings.length > 0;
 }
 
@@ -146,40 +136,25 @@ export class WorkflowOrchestratorService {
     return this.runPolicyAndRoute(caseId);
   }
 
-  async submitDraftCase(caseId: string, input: { notes?: string; filenames: string[] }) {
+  async submitDraftCase(caseId: string, input: { notes?: string; filenames?: string[] }) {
     const existing = await this.casesService.getCase(caseId);
     if (!existing) {
       return { error: "Case not found" } as const;
     }
 
-    let filenamesForIntake: string[];
-
-    if (input.filenames.length > 0) {
-      const createdArtifacts = await this.artifactsService.attachMany(caseId, input.filenames, {
-        storagePrefix: "mock://artifacts",
-        processingStatus: "UPLOADED",
-      });
-
-      await Promise.all(
-        createdArtifacts.map((artifact: { id: string; storageUri?: string | null }) =>
-          this.processArtifactUpload(caseId, artifact.id, artifact.storageUri ?? undefined),
-        ),
-      );
-
-      filenamesForIntake = input.filenames;
-    } else {
-      const existingArtifacts = await this.artifactsService.listForCase(caseId);
-      const ready = existingArtifacts.filter(
-        (artifact) => artifact.processingStatus === "PROCESSED" || artifact.processingStatus === "UPLOADED",
-      );
-      if (!ready.length) {
-        return {
-          error:
-            "No artifacts to submit: add files using the upload control, or provide at least one filename for mock-only artifacts.",
-        } as const;
-      }
-      filenamesForIntake = ready.map((artifact) => artifact.filename);
+    // The legacy `filenames` field on the submit DTO previously created mock artifacts with no
+    // file bytes. Real submissions must now upload files first via POST /cases/:id/artifacts/upload.
+    // We accept the field for backwards compatibility but ignore it: extraction needs real bytes.
+    const existingArtifacts = await this.artifactsService.listForCase(caseId);
+    const ready = existingArtifacts.filter(
+      (artifact) => artifact.processingStatus === "PROCESSED" || artifact.processingStatus === "UPLOADED",
+    );
+    if (!ready.length) {
+      return {
+        error: "No artifacts to submit. Upload at least one file before submitting this case.",
+      } as const;
     }
+    const filenamesForIntake = ready.map((artifact) => artifact.filename);
 
     const intakeArtifacts = await this.collectIntakeArtifacts(caseId);
 
@@ -233,33 +208,51 @@ export class WorkflowOrchestratorService {
       assignedTo: existing.requesterId,
     });
 
-    const aiResult = await this.jobRunner.dispatch<
-      {
-        caseId: string;
-        workflowType: typeof existing.workflowType;
-        notes?: string;
-        artifacts: Array<{
-          id: string;
-          filename: string;
-          mimeType?: string | null;
-          source?: string | null;
-          extractedText?: string | null;
-          processingStatus: string;
-          checksum?: string | null;
-          metadata?: Record<string, unknown> | null;
-        }>;
-      },
-      AiIntakeResult
-    >(
-      queueNames.aiIntake,
-      "analyze-intake",
-      {
+    let aiResult: AiIntakeResult;
+    try {
+      aiResult = await this.jobRunner.dispatch<
+        {
+          caseId: string;
+          workflowType: typeof existing.workflowType;
+          notes?: string;
+          artifacts: IntakeArtifactEvidence[];
+        },
+        AiIntakeResult
+      >(
+        queueNames.aiIntake,
+        "analyze-intake",
+        {
+          caseId,
+          workflowType: existing.workflowType,
+          notes: input.notes,
+          artifacts: intakeArtifacts,
+        },
+      );
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "Unknown AI provider error";
+      await this.auditService.recordEvent({
         caseId,
-        workflowType: existing.workflowType,
-        notes: input.notes,
-        artifacts: intakeArtifacts,
-      },
-    );
+        eventType: "AI_INTAKE_FAILED",
+        actorType: "SYSTEM",
+        payload: {
+          reason,
+          notes: input.notes ?? null,
+          filenames: filenamesForIntake,
+        },
+      });
+      await this.workflowService.transitionCase({
+        caseId,
+        from: "INTAKE_PROCESSING",
+        to: "RECOVERABLE_EXCEPTION",
+        actorType: "SYSTEM",
+        note: `AI intake failed: ${reason}`,
+        assignedTo: existing.requesterId,
+      });
+      return {
+        error:
+          "AI intake is temporarily unavailable. The case is in recoverable exception; please retry from the recovery queue.",
+      } as const;
+    }
 
     await this.workflowService.transitionCase({
       caseId,
@@ -418,22 +411,42 @@ export class WorkflowOrchestratorService {
       return null;
     }
 
-    const aiResult = await this.jobRunner.dispatch<
-      {
-        caseId: string;
-        workflowType: typeof caseRecord.workflowType;
-        artifacts: IntakeArtifactEvidence[];
-      },
-      AiIntakeResult
-    >(
-      queueNames.aiIntake,
-      "analyze-intake",
-      {
+    let aiResult: AiIntakeResult;
+    try {
+      aiResult = await this.jobRunner.dispatch<
+        {
+          caseId: string;
+          workflowType: typeof caseRecord.workflowType;
+          artifacts: IntakeArtifactEvidence[];
+        },
+        AiIntakeResult
+      >(
+        queueNames.aiIntake,
+        "analyze-intake",
+        {
+          caseId,
+          workflowType: caseRecord.workflowType,
+          artifacts: intakeArtifacts,
+        },
+      );
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "Unknown AI provider error";
+      // Retry path: keep the case in its prior status, but record the failure for operators.
+      // Do not auto-demote to RECOVERABLE_EXCEPTION here because the case still has a usable
+      // prior extraction; surfacing the failure as an audit event lets reviewers decide.
+      await this.auditService.recordEvent({
         caseId,
-        workflowType: caseRecord.workflowType,
-        artifacts: intakeArtifacts,
-      },
-    );
+        eventType: "AI_INTAKE_RETRY_FAILED",
+        actorType: "SYSTEM",
+        payload: {
+          reason,
+          triggerArtifactId,
+          caseStatus: caseRecord.status,
+          priorExtractionId: priorExtraction?.id ?? null,
+        },
+      });
+      return null;
+    }
 
     const enrichedExtraction: ExtractionResult = {
       ...aiResult.extraction,

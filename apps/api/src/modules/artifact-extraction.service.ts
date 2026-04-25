@@ -148,6 +148,9 @@ export class ArtifactExtractionService {
     const warnings: string[] = [];
 
     if (!localPath) {
+      // Legacy compat: pre-existing `mock://` artifact rows have no on-disk bytes, so we emit a
+      // placeholder description here. New submissions cannot reach this branch because the
+      // upload-then-submit flow guarantees a `local://` storageUri.
       const extractedText = this.createMockOnlyPlaceholder(artifact.filename, mimeType, artifact.source ?? undefined);
       warnings.push("Artifact has no local file; used mock placeholder extraction.");
       return {

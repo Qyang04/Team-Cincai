@@ -48,6 +48,33 @@ function createWorkflowOrchestratorHarness() {
     },
   };
 
+  const defaultUploadedArtifacts: Array<Record<string, unknown>> = [
+    {
+      id: "artifact-1",
+      caseId: "case-1",
+      filename: "receipt.jpg",
+      mimeType: "image/jpeg",
+      source: "upload",
+      extractedText: "Receipt RM 75 OPS-12",
+      processingStatus: "PROCESSED",
+      checksum: "abc",
+      storageUri: "local://artifacts/artifact-1.jpg",
+      metadata: { extractionMethod: "OCR_IMAGE" },
+    },
+    {
+      id: "artifact-2",
+      caseId: "case-1",
+      filename: "parking.jpg",
+      mimeType: "image/jpeg",
+      source: "upload",
+      extractedText: "Parking RM 5",
+      processingStatus: "PROCESSED",
+      checksum: "def",
+      storageUri: "local://artifacts/artifact-2.jpg",
+      metadata: { extractionMethod: "OCR_IMAGE" },
+    },
+  ];
+
   const artifactsService = {
     attachMany: async (_caseId: string, filenames: string[], defaults?: Record<string, unknown>) => {
       attachedArtifacts.push({ filenames, defaults });
@@ -56,12 +83,12 @@ function createWorkflowOrchestratorHarness() {
         filename: filenames[index],
       }));
     },
-    listForCase: async () => [],
+    listForCase: async () => defaultUploadedArtifacts,
     getArtifact: async (artifactId: string) => ({
       id: artifactId,
       caseId: "case-1",
       filename: artifactId === "artifact-1" ? "receipt.jpg" : "parking.jpg",
-      storageUri: `mock://artifacts/${artifactId}.jpg`,
+      storageUri: `local://artifacts/${artifactId}.jpg`,
     }),
     markUploaded: async () => undefined,
     markProcessed: async () => undefined,
@@ -166,15 +193,13 @@ test("WorkflowOrchestratorService submits a draft case through intake and policy
 
   const result = await harness.service.submitDraftCase("case-1", {
     notes: "Lunch reimbursement OPS-12 75 MYR",
-    filenames: ["receipt.jpg", "parking.jpg"],
   });
 
   assert.deepEqual(
     harness.transitions.map((transition) => transition.to),
     ["SUBMITTED", "INTAKE_PROCESSING", "POLICY_REVIEW"],
   );
-  assert.equal(harness.attachedArtifacts.length, 1);
-  assert.equal(harness.processedUploads.length, 2);
+  assert.equal(harness.attachedArtifacts.length, 0, "submit must not attach mock artifacts");
   assert.equal(harness.persistedIntakeResults.length, 1);
   const routedCase = "case" in result ? result.case : undefined;
   assert.deepEqual(routedCase, {
@@ -188,7 +213,41 @@ test("WorkflowOrchestratorService submits a draft case through intake and policy
     updatedAt: "2026-04-22T10:00:00.000Z",
   });
   assert.deepEqual(result.policyResult, harness.policyRouteResult.policyResult);
-  assert.equal(harness.auditEvents[2]?.eventType, "AI_INTAKE_ANALYZED");
+  assert.equal(
+    harness.auditEvents.find((event) => event.eventType === "AI_INTAKE_ANALYZED") !== undefined,
+    true,
+  );
+});
+
+test("WorkflowOrchestratorService rejects submit when no artifacts have been uploaded", async () => {
+  const harness = createWorkflowOrchestratorHarness();
+  const artifactsService = harness.service["artifactsService"] as {
+    listForCase: (caseId: string) => Promise<Array<Record<string, unknown>>>;
+  };
+  artifactsService.listForCase = async () => [];
+
+  const result = await harness.service.submitDraftCase("case-1", { notes: "anything" });
+
+  assert.equal("error" in result, true);
+  assert.match(String((result as { error: string }).error), /upload at least one file/i);
+  assert.equal(harness.transitions.length, 0, "no state transition should occur on missing artifacts");
+});
+
+test("WorkflowOrchestratorService ignores legacy filenames field on submit (graceful compat)", async () => {
+  const harness = createWorkflowOrchestratorHarness();
+
+  const result = await harness.service.submitDraftCase("case-1", {
+    notes: "Legacy caller still sending filenames",
+    filenames: ["should-be-ignored.jpg"],
+  });
+
+  assert.equal(harness.attachedArtifacts.length, 0, "legacy filenames must not create mock artifacts");
+  assert.deepEqual(
+    harness.transitions.map((transition) => transition.to),
+    ["SUBMITTED", "INTAKE_PROCESSING", "POLICY_REVIEW"],
+  );
+  const routedCase = "case" in result ? result.case : undefined;
+  assert.equal(routedCase?.status, "AWAITING_APPROVAL");
 });
 
 test("WorkflowOrchestratorService returns clarification state when AI intake needs requester follow-up", async () => {
@@ -230,7 +289,6 @@ test("WorkflowOrchestratorService returns clarification state when AI intake nee
 
   const result = await harness.service.submitDraftCase("case-1", {
     notes: "Lunch reimbursement 75 MYR",
-    filenames: ["receipt.jpg"],
   });
 
   assert.deepEqual(
@@ -250,7 +308,6 @@ test("WorkflowOrchestratorService returns clarification state when AI intake nee
   });
   assert.equal(result.policyResult, null);
   assert.equal(harness.persistedIntakeResults.length, 1);
-  assert.equal(harness.auditEvents[1]?.eventType, "ARTIFACT_UPLOADED");
   assert.equal(harness.auditEvents[harness.auditEvents.length - 1]?.eventType, "AI_INTAKE_ANALYZED");
 });
 
@@ -467,6 +524,109 @@ test("WorkflowOrchestratorService skips retry re-ingestion when evidence text is
     (event) => event.eventType === "ARTIFACT_RETRY_REINGESTED",
   );
   assert.equal(retryAuditEvent, undefined, "no retry audit event when digest matches");
+});
+
+test("WorkflowOrchestratorService demotes the case to RECOVERABLE_EXCEPTION when AI intake throws", async () => {
+  const harness = createWorkflowOrchestratorHarness();
+
+  const jobRunner = harness.service["jobRunner"] as {
+    dispatch: <TPayload, TResult>(
+      queueName: QueueName,
+      jobName: string,
+      payload: TPayload,
+    ) => Promise<TResult>;
+  };
+  const originalDispatch = jobRunner.dispatch.bind(jobRunner);
+
+  jobRunner.dispatch = async <TPayload, TResult>(
+    queueName: QueueName,
+    jobName: string,
+    payload: TPayload,
+  ) => {
+    if (jobName === "analyze-intake") {
+      const error = new Error("Z.AI 503 service unavailable") as Error & { status?: number };
+      error.status = 503;
+      throw error;
+    }
+    return originalDispatch(queueName, jobName, payload);
+  };
+
+  const result = await harness.service.submitDraftCase("case-1", {
+    notes: "Lunch reimbursement 75 MYR",
+  });
+
+  assert.deepEqual(
+    harness.transitions.map((transition) => transition.to),
+    ["SUBMITTED", "INTAKE_PROCESSING", "RECOVERABLE_EXCEPTION"],
+  );
+  assert.equal("error" in result, true);
+  const failedAudit = harness.auditEvents.find((event) => event.eventType === "AI_INTAKE_FAILED");
+  assert.ok(failedAudit, "AI_INTAKE_FAILED audit event should be recorded");
+  assert.match(
+    String((failedAudit?.payload as Record<string, unknown>).reason),
+    /503/,
+  );
+  assert.equal(harness.persistedIntakeResults.length, 0);
+});
+
+test("WorkflowOrchestratorService records AI_INTAKE_RETRY_FAILED but keeps prior status when retry intake throws", async () => {
+  const harness = createWorkflowOrchestratorHarness();
+  harness.setCurrentStatus("POLICY_REVIEW");
+
+  const artifactsService = harness.service["artifactsService"] as {
+    listForCase: (caseId: string) => Promise<Array<Record<string, unknown>>>;
+  };
+  artifactsService.listForCase = async () => [
+    {
+      id: "artifact-1",
+      filename: "receipt.jpg",
+      extractedText: "Receipt RM 85.50 OPS-12",
+      processingStatus: "PROCESSED",
+      checksum: "abc",
+      metadata: { extractionMethod: "OCR_IMAGE" },
+    },
+  ];
+
+  const intakeService = harness.service["intakeService"] as {
+    persistIntakeResult: (...args: unknown[]) => Promise<unknown>;
+    getLatestExtraction?: (caseId: string) => Promise<unknown>;
+    listQuestions?: (caseId: string) => Promise<unknown[]>;
+  };
+  intakeService.getLatestExtraction = async () => ({
+    id: "extraction-prior",
+    modelMetadata: null,
+  });
+  intakeService.listQuestions = async () => [];
+
+  const jobRunner = harness.service["jobRunner"] as {
+    dispatch: <TPayload, TResult>(
+      queueName: QueueName,
+      jobName: string,
+      payload: TPayload,
+    ) => Promise<TResult>;
+  };
+  const originalDispatch = jobRunner.dispatch.bind(jobRunner);
+  jobRunner.dispatch = async <TPayload, TResult>(
+    queueName: QueueName,
+    jobName: string,
+    payload: TPayload,
+  ) => {
+    if (jobName === "analyze-intake") {
+      throw new Error("network blip");
+    }
+    return originalDispatch(queueName, jobName, payload);
+  };
+
+  await harness.service.processArtifactUpload("case-1", "artifact-1", "mock://artifacts/artifact-1.jpg");
+
+  const retryFailed = harness.auditEvents.find(
+    (event) => event.eventType === "AI_INTAKE_RETRY_FAILED",
+  );
+  assert.ok(retryFailed, "AI_INTAKE_RETRY_FAILED audit event should be recorded");
+  assert.equal(harness.persistedIntakeResults.length, 0);
+  // Status should NOT change on retry failure (no transitions added beyond what processArtifactUpload itself triggers).
+  const statusChanges = harness.transitions.filter((t) => t.to === "RECOVERABLE_EXCEPTION");
+  assert.equal(statusChanges.length, 0);
 });
 
 test("WorkflowOrchestratorService recovers recoverable exceptions by re-entering policy routing", async () => {

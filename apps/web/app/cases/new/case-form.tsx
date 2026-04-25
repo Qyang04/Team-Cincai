@@ -201,10 +201,7 @@ export function CaseForm() {
             "Content-Type": "application/json",
             ...authHeaders,
           },
-          body: JSON.stringify({
-            notes: submittedNotes,
-            filenames: [],
-          }),
+          body: JSON.stringify({ notes: submittedNotes }),
         });
 
         if (!submitResponse.ok) {
@@ -400,8 +397,7 @@ export function CaseForm() {
           <div className="stack-list" style={{ gap: 8 }}>
             <p className="detail-label">Staged files (full upload on submit)</p>
             <p className="muted" style={{ margin: 0, fontSize: "0.9rem" }}>
-              While files are listed here, submit sends their bytes to the API. The filename-only box is ignored until you
-              remove every staged file.
+              Submit sends each file&apos;s bytes to the API where they are stored on disk and OCR-processed before AI intake.
             </p>
             <div className="split-actions" style={{ flexWrap: "wrap", gap: 8, justifyContent: "flex-start" }}>
               {stagedFiles.map((file) => (

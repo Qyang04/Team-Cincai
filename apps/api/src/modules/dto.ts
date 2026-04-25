@@ -1,10 +1,5 @@
 import { z } from "zod";
 
-export const attachArtifactsSchema = z.object({
-  filenames: z.array(z.string()).min(1),
-  mimeType: z.string().optional(),
-});
-
 export const answerQuestionSchema = z.object({
   answer: z.string().min(1).max(2000),
 });

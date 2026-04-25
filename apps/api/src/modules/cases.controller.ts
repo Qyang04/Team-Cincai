@@ -40,7 +40,6 @@ import { CasesService } from "./cases.service";
 import {
   answerQuestionSchema,
   approvalDecisionSchema,
-  attachArtifactsSchema,
   completeArtifactUploadSchema,
   delegateApprovalSchema,
   financeDecisionSchema,
@@ -333,34 +332,6 @@ export class CasesController {
       caseId: id,
       filename: input.filename,
       mimeType: input.mimeType,
-    });
-  }
-
-  @Post(":id/artifacts")
-  async attachArtifacts(
-    @Param("id") id: string,
-    @CurrentUser() user: AuthenticatedUser,
-    @Body()
-    body: {
-      filenames: string[];
-      mimeType?: string;
-    },
-  ) {
-    const caseRecord = await this.casesService.getCase(id);
-    if (!caseRecord) {
-      throw new NotFoundException("Case not found");
-    }
-    if (caseRecord.status !== "DRAFT") {
-      throw new BadRequestException("Artifacts can only be attached while the case is in DRAFT.");
-    }
-    if (caseRecord.requesterId !== user.id && !user.roles.includes("ADMIN")) {
-      throw new ForbiddenException("Only the requester or an admin can attach artifacts for this case.");
-    }
-    const input = attachArtifactsSchema.parse(body);
-    return this.artifactsService.attachMany(id, input.filenames, {
-      mimeType: input.mimeType,
-      storagePrefix: "mock://artifacts",
-      processingStatus: "PREPARED",
     });
   }
 
