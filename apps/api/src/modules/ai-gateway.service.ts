@@ -15,7 +15,15 @@ function shouldFallbackToMock(error: unknown): boolean {
   }
 
   const message = error.message.toLowerCase();
-  return message.includes("timeout") || message.includes("timed out") || message.includes("econnreset");
+  return (
+    message.includes("timeout") ||
+    message.includes("timed out") ||
+    message.includes("econnreset") ||
+    message.includes("zoderror") ||
+    message.includes("expected number") ||
+    message.includes("expected string") ||
+    message.includes("expected object")
+  );
 }
 
 @Injectable()
@@ -40,7 +48,7 @@ export class AiGatewayService {
     try {
       return await this.zaiProvider.analyzeIntake(input);
     } catch (error) {
-      const fallbackEnabled = (process.env.AI_FALLBACK_TO_MOCK ?? "true").toLowerCase() !== "false";
+      const fallbackEnabled = (process.env.AI_FALLBACK_TO_MOCK ?? "false").toLowerCase() !== "false";
       if (!fallbackEnabled || !shouldFallbackToMock(error)) {
         throw error;
       }

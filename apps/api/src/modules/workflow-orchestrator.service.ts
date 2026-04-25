@@ -41,6 +41,25 @@ type IntakeArtifactEvidence = {
   metadata?: Record<string, unknown> | null;
 };
 
+function hasEmptyExtractedText(artifact: IntakeArtifactEvidence): boolean {
+  if (artifact.processingStatus !== "PROCESSED") {
+    return false;
+  }
+  return (artifact.extractedText ?? "").trim().length === 0;
+}
+
+function hasExtractionWarnings(artifact: IntakeArtifactEvidence): boolean {
+  if (artifact.processingStatus !== "PROCESSED") {
+    return false;
+  }
+  const metadata = artifact.metadata;
+  if (!metadata || typeof metadata !== "object") {
+    return false;
+  }
+  const warnings = metadata.extractionWarnings;
+  return Array.isArray(warnings) && warnings.length > 0;
+}
+
 // Only cases whose workflow position still depends on fresh intake evidence are eligible
 // for a silent re-ingestion. DRAFT is excluded because submitDraftCase owns that path and
 // runs the first intake pass itself. INTAKE_PROCESSING is excluded to avoid racing the
@@ -163,6 +182,37 @@ export class WorkflowOrchestratorService {
     }
 
     const intakeArtifacts = await this.collectIntakeArtifacts(caseId);
+
+    const blockedArtifacts = intakeArtifacts.filter(
+      (artifact) => hasEmptyExtractedText(artifact) || hasExtractionWarnings(artifact),
+    );
+    if (blockedArtifacts.length > 0) {
+      const replacementCase = await this.casesService.createCase({
+        workflowType: existing.workflowType,
+        requesterId: existing.requesterId,
+      });
+
+      await this.auditService.recordEvent({
+        caseId,
+        eventType: "SUBMISSION_BLOCKED_EMPTY_EXTRACTION",
+        actorType: "SYSTEM",
+        payload: {
+          blockedArtifactIds: blockedArtifacts.map((artifact) => artifact.id),
+          blockedFilenames: blockedArtifacts.map((artifact) => artifact.filename),
+          blockedReasons: blockedArtifacts.map((artifact) => ({
+            artifactId: artifact.id,
+            filename: artifact.filename,
+            hasEmptyExtractedText: hasEmptyExtractedText(artifact),
+            hasExtractionWarnings: hasExtractionWarnings(artifact),
+          })),
+          replacementCaseId: replacementCase.id,
+        },
+      });
+
+      return {
+        error: `Submission blocked: one or more files could not be read reliably (empty extracted text or extraction warnings). A new draft case (${replacementCase.id}) was created automatically. Please open the new case and re-upload clearer files before submitting again.`,
+      } as const;
+    }
 
     await this.workflowService.transitionCase({
       caseId,

@@ -9,7 +9,7 @@ import {
 } from "@finance-ops/shared";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState, useTransition, type ClipboardEvent, type DragEvent } from "react";
+import { useEffect, useRef, useState, useTransition, type ClipboardEvent, type DragEvent } from "react";
 import { getApiBaseUrl, getClientAuthHeaders } from "../../lib/client-session";
 
 const workflowOptions: ReadonlyArray<{ value: WorkflowType; label: string }> = [
@@ -25,8 +25,6 @@ type SubmissionState =
   | { kind: "idle" }
   | { kind: "success"; data: CaseSubmissionResponse }
   | { kind: "error"; error: string };
-
-const defaultFilenames: string[] = [];
 
 function fileKey(file: File): string {
   return `${file.name}:${file.size}:${file.lastModified}`;
@@ -54,15 +52,30 @@ async function readHttpErrorMessage(response: Response, fallback: string): Promi
   return fallback;
 }
 
+function isReuploadRequiredErrorMessage(message: string): boolean {
+  return /Submission blocked: one or more files could not be read reliably/i.test(message);
+}
+
 export function CaseForm() {
   const [state, setState] = useState<SubmissionState>({ kind: "idle" });
-  const [filenames, setFilenames] = useState<string[]>(defaultFilenames);
+  const [notes, setNotes] = useState("Please reimburse Sarah for client lunch and parking from yesterday.");
   const [stagedFiles, setStagedFiles] = useState<File[]>([]);
-  const [useMockArtifacts, setUseMockArtifacts] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isPending, startTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const dropzoneRef = useRef<HTMLDivElement | null>(null);
   const router = useRouter();
+
+  const requiresFreshUpload =
+    state.kind === "error" && isReuploadRequiredErrorMessage(state.error);
+
+  useEffect(() => {
+    if (!requiresFreshUpload) {
+      return;
+    }
+    dropzoneRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    fileInputRef.current?.focus();
+  }, [requiresFreshUpload]);
 
   function addStagedFiles(files: File[]) {
     if (!files.length) return;
@@ -107,10 +120,6 @@ export function CaseForm() {
     }
   }
 
-  function removeFilename(target: string) {
-    setFilenames((current) => current.filter((name) => name !== target));
-  }
-
   function removeStagedFile(target: File) {
     const key = fileKey(target);
     setStagedFiles((current) => current.filter((file) => fileKey(file) !== key));
@@ -120,14 +129,18 @@ export function CaseForm() {
     setState({ kind: "idle" });
 
     const workflowType = String(formData.get("workflowType") ?? "EXPENSE_CLAIM");
-    const notes = String(formData.get("notes") ?? "");
-    const submittedFilenames = useMockArtifacts ? filenames.map((name) => name.trim()).filter(Boolean) : [];
+    const submittedNotes = String(formData.get("notes") ?? "");
     const filesToUpload = [...stagedFiles];
 
     startTransition(async () => {
       try {
-        if (!filesToUpload.length && !submittedFilenames.length) {
-          throw new Error("Add at least one real file to upload, or explicitly switch to mock artifact mode.");
+        if (requiresFreshUpload && !filesToUpload.length) {
+          throw new Error(
+            "A fresh uploaded file is required before resubmitting this case. Please upload a clearer receipt or document.",
+          );
+        }
+        if (!filesToUpload.length) {
+          throw new Error("Add at least one real file to upload before submitting.");
         }
 
         const createResponse = await fetch(`${apiBaseUrl}/cases`, {
@@ -174,8 +187,8 @@ export function CaseForm() {
             ...authHeaders,
           },
           body: JSON.stringify({
-            notes,
-            filenames: filesToUpload.length ? [] : submittedFilenames,
+            notes: submittedNotes,
+            filenames: [],
           }),
         });
 
@@ -188,9 +201,10 @@ export function CaseForm() {
           data: caseSubmissionResponseSchema.parse(await submitResponse.json()),
         });
       } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unexpected error while submitting case.";
         setState({
           kind: "error",
-          error: error instanceof Error ? error.message : "Unexpected error while submitting case.",
+          error: errorMessage,
         });
       }
     });
@@ -200,6 +214,7 @@ export function CaseForm() {
     <form action={handleSubmit} className="form-grid">
       <div className="stack-list">
         <div
+          ref={dropzoneRef}
           className="intake-dropzone"
           role="button"
           tabIndex={0}
@@ -220,7 +235,11 @@ export function CaseForm() {
           onPaste={handlePaste}
           style={{
             cursor: "pointer",
-            outline: isDragging ? "2px dashed var(--accent)" : undefined,
+            outline: requiresFreshUpload
+              ? "2px solid #dc2626"
+              : isDragging
+                ? "2px dashed var(--accent)"
+                : undefined,
             outlineOffset: isDragging ? "-6px" : undefined,
             transition: "outline 120ms ease",
           }}
@@ -231,8 +250,7 @@ export function CaseForm() {
             <strong>Stage the evidence for this request</strong>
             <p className="muted">
               Click, drag and drop, or paste (Ctrl+V) real files. Each file is uploaded to the API and stored under{" "}
-              <code>.local-artifacts/</code> on the server (see <code>LOCAL_ARTIFACT_DIR</code>). If you do not add
-              files, you can still switch to mock-only mode below for seeded demo scenarios.
+              <code>.local-artifacts/</code> on the server (see <code>LOCAL_ARTIFACT_DIR</code>).
             </p>
           </div>
           <input
@@ -246,6 +264,11 @@ export function CaseForm() {
             }}
           />
         </div>
+        {requiresFreshUpload ? (
+          <p className="text-danger" style={{ margin: 0 }}>
+            Upload is required: this case is blocked until you attach a newly uploaded, clearer file.
+          </p>
+        ) : null}
 
         {stagedFiles.length ? (
           <div className="stack-list" style={{ gap: 8 }}>
@@ -287,53 +310,6 @@ export function CaseForm() {
           </div>
         ) : null}
 
-        {!stagedFiles.length ? (
-          <div className="stack-list" style={{ gap: 8 }}>
-            <label
-              className="inline-status"
-              style={{ display: "inline-flex", alignItems: "center", gap: 8, width: "fit-content" }}
-            >
-              <input
-                type="checkbox"
-                checked={useMockArtifacts}
-                onChange={(event) => setUseMockArtifacts(event.target.checked)}
-                suppressHydrationWarning
-              />
-              Use mock artifact mode instead of uploading real files
-            </label>
-
-            {useMockArtifacts && filenames.length ? (
-              <div className="split-actions" style={{ flexWrap: "wrap", gap: 8, justifyContent: "flex-start" }}>
-                {filenames.map((name) => (
-                  <span
-                    key={name}
-                    className="inline-status"
-                    style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-                  >
-                    <code>{name}</code>
-                    <button
-                      type="button"
-                      aria-label={`Remove ${name}`}
-                      onClick={() => removeFilename(name)}
-                      suppressHydrationWarning
-                      style={{
-                        border: "none",
-                        background: "transparent",
-                        cursor: "pointer",
-                        fontSize: "1rem",
-                        lineHeight: 1,
-                        padding: 0,
-                      }}
-                    >
-                      x
-                    </button>
-                  </span>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-
         <div className="field-grid">
           <label className="field">
             <span className="field-label">Workflow type</span>
@@ -357,31 +333,13 @@ export function CaseForm() {
           <textarea
             name="notes"
             rows={5}
-            defaultValue="Please reimburse Sarah for client lunch and parking from yesterday."
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
             className="field-control textarea-tall"
             suppressHydrationWarning
           />
         </label>
 
-        <label className="field">
-          <span className="field-label">Mock-only filenames (one per line)</span>
-          <textarea
-            rows={4}
-            value={filenames.join("\n")}
-            onChange={(event) =>
-              setFilenames(
-                event.target.value
-                  .split("\n")
-                  .map((item) => item.trim())
-                  .filter(Boolean),
-              )
-            }
-            className="field-control field-control-mono"
-            placeholder="Used only when mock artifact mode is enabled above"
-            disabled={stagedFiles.length > 0 || !useMockArtifacts}
-            suppressHydrationWarning
-          />
-        </label>
       </div>
 
       <div className="action-row">
@@ -399,9 +357,8 @@ export function CaseForm() {
           suppressHydrationWarning
           onClick={() => {
             setState({ kind: "idle" });
-            setFilenames(defaultFilenames);
+            setNotes("Please reimburse Sarah for client lunch and parking from yesterday.");
             setStagedFiles([]);
-            setUseMockArtifacts(false);
             router.refresh();
           }}
         >

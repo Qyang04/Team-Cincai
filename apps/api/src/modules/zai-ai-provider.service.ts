@@ -43,37 +43,93 @@ function normalizeDecisionNextState(
   return extraction.openQuestions.length > 0 ? "AWAITING_REQUESTER_INFO" : "POLICY_REVIEW";
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+}
+
+function asString(value: unknown): string | undefined {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+  if (typeof value === "boolean") {
+    return value ? "true" : "false";
+  }
+  const objectValue = asRecord(value);
+  if (objectValue) {
+    return (
+      asString(objectValue.value) ??
+      asString(objectValue.text) ??
+      asString(objectValue.label) ??
+      asString(objectValue.name) ??
+      asString(objectValue.content)
+    );
+  }
+  return undefined;
+}
+
+function asNumber(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  const stringValue = asString(value);
+  if (!stringValue) {
+    return undefined;
+  }
+  const normalized = stringValue.replace(/,/g, "");
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function normalizeFields(rawFields: Record<string, unknown>): Record<string, unknown> {
+  const normalized: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(rawFields)) {
+    if (key.toLowerCase().includes("amount") || key.toLowerCase().includes("rate")) {
+      const numeric = asNumber(value);
+      normalized[key] = numeric ?? asString(value) ?? value;
+      continue;
+    }
+    normalized[key] = asString(value) ?? value;
+  }
+  return normalized;
+}
+
+function normalizeProvenance(value: unknown): Record<string, string> {
+  const record = asRecord(value);
+  if (!record) {
+    return {};
+  }
+  const normalized: Record<string, string> = {};
+  for (const [key, raw] of Object.entries(record)) {
+    const parsed = asString(raw);
+    if (parsed) {
+      normalized[key] = parsed;
+    }
+  }
+  return normalized;
+}
+
 function normalizeParsedResult(rawParsed: Record<string, unknown>): {
   extraction: ExtractionResult;
   decision: WorkflowDecision;
 } {
-  const rawExtraction =
-    rawParsed.extraction && typeof rawParsed.extraction === "object"
-      ? (rawParsed.extraction as Record<string, unknown>)
-      : {};
+  const rawExtraction = asRecord(rawParsed.extraction) ?? {};
+  const rawFields = asRecord(rawExtraction.fields) ?? {};
   const extraction = extractionResultSchema.parse({
-    fields:
-      rawExtraction.fields && typeof rawExtraction.fields === "object"
-        ? (rawExtraction.fields as Record<string, unknown>)
-        : {},
+    fields: normalizeFields(rawFields),
     confidence: typeof rawExtraction.confidence === "number" ? rawExtraction.confidence : 0.6,
-    provenance:
-      rawExtraction.provenance && typeof rawExtraction.provenance === "object"
-        ? (rawExtraction.provenance as Record<string, string>)
-        : {},
+    provenance: normalizeProvenance(rawExtraction.provenance),
     openQuestions: Array.isArray(rawExtraction.openQuestions)
       ? rawExtraction.openQuestions.map((value) => String(value))
       : [],
     modelMetadata:
-      rawExtraction.modelMetadata && typeof rawExtraction.modelMetadata === "object"
-        ? (rawExtraction.modelMetadata as Record<string, unknown>)
-        : undefined,
+      asRecord(rawExtraction.modelMetadata) ?? undefined,
   });
 
-  const rawDecision =
-    rawParsed.decision && typeof rawParsed.decision === "object"
-      ? (rawParsed.decision as Record<string, unknown>)
-      : {};
+  const rawDecision = asRecord(rawParsed.decision) ?? {};
 
   return {
     extraction,

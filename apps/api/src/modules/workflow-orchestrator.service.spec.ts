@@ -7,6 +7,7 @@ function createWorkflowOrchestratorHarness() {
   const transitions: Array<Record<string, unknown>> = [];
   const auditEvents: Array<Record<string, unknown>> = [];
   const attachedArtifacts: Array<Record<string, unknown>> = [];
+  const createdCases: Array<Record<string, unknown>> = [];
   const processedUploads: Array<Record<string, unknown>> = [];
   const persistedIntakeResults: Array<Record<string, unknown>> = [];
   const dispatchCalls: Array<Record<string, unknown>> = [];
@@ -28,6 +29,15 @@ function createWorkflowOrchestratorHarness() {
       createdAt: new Date("2026-04-22T09:00:00.000Z"),
       updatedAt: new Date("2026-04-22T10:00:00.000Z"),
     }),
+    createCase: async (input: { workflowType: string; requesterId: string }) => {
+      createdCases.push(input);
+      return {
+        id: "case-reupload-1",
+        workflowType: input.workflowType,
+        requesterId: input.requesterId,
+        status: "DRAFT",
+      };
+    },
   };
 
   const workflowService = {
@@ -139,6 +149,7 @@ function createWorkflowOrchestratorHarness() {
     transitions,
     auditEvents,
     attachedArtifacts,
+    createdCases,
     processedUploads,
     persistedIntakeResults,
     dispatchCalls,
@@ -241,6 +252,92 @@ test("WorkflowOrchestratorService returns clarification state when AI intake nee
   assert.equal(harness.persistedIntakeResults.length, 1);
   assert.equal(harness.auditEvents[1]?.eventType, "ARTIFACT_UPLOADED");
   assert.equal(harness.auditEvents[harness.auditEvents.length - 1]?.eventType, "AI_INTAKE_ANALYZED");
+});
+
+test("WorkflowOrchestratorService blocks submit and creates replacement draft when extracted text is empty", async () => {
+  const harness = createWorkflowOrchestratorHarness();
+
+  const artifactsService = harness.service["artifactsService"] as {
+    listForCase: (caseId: string) => Promise<Array<Record<string, unknown>>>;
+  };
+  artifactsService.listForCase = async () => [
+    {
+      id: "artifact-empty-1",
+      filename: "blurred-receipt.jpg",
+      extractedText: "",
+      processingStatus: "PROCESSED",
+      checksum: "abc",
+      metadata: { extractionMethod: "OCR_IMAGE" },
+    },
+  ];
+
+  const result = await harness.service.submitDraftCase("case-1", {
+    notes: "Receipt for lunch reimbursement",
+    filenames: ["blurred-receipt.jpg"],
+  });
+
+  assert.equal("error" in result, true);
+  if ("error" in result) {
+    const errorMessage = result.error ?? "";
+    assert.match(
+      errorMessage,
+      /Submission blocked: one or more files could not be read reliably \(empty extracted text or extraction warnings\)/,
+    );
+    assert.match(errorMessage, /case-reupload-1/);
+  }
+  assert.equal(harness.transitions.length, 0);
+  assert.equal(harness.persistedIntakeResults.length, 0);
+  assert.deepEqual(harness.createdCases, [
+    {
+      workflowType: "EXPENSE_CLAIM",
+      requesterId: "demo.requester",
+    },
+  ]);
+  const blockedEvent = harness.auditEvents.find(
+    (event) => event.eventType === "SUBMISSION_BLOCKED_EMPTY_EXTRACTION",
+  );
+  assert.ok(blockedEvent);
+});
+
+test("WorkflowOrchestratorService blocks submit when artifact extraction warnings exist", async () => {
+  const harness = createWorkflowOrchestratorHarness();
+
+  const artifactsService = harness.service["artifactsService"] as {
+    listForCase: (caseId: string) => Promise<Array<Record<string, unknown>>>;
+  };
+  artifactsService.listForCase = async () => [
+    {
+      id: "artifact-warning-1",
+      filename: "receipt-lunch-1200.jpg",
+      extractedText: "mock-extracted-text(receipt): receipt-lunch-1200.jpg",
+      processingStatus: "PROCESSED",
+      checksum: "abc",
+      metadata: {
+        extractionMethod: "MOCK_PLACEHOLDER",
+        extractionWarnings: ["Artifact has no local file; used mock placeholder extraction."],
+      },
+    },
+  ];
+
+  const result = await harness.service.submitDraftCase("case-1", {
+    notes: "Expense claim lunch reimbursement",
+    filenames: ["receipt-lunch-1200.jpg"],
+  });
+
+  assert.equal("error" in result, true);
+  if ("error" in result) {
+    const errorMessage = result.error ?? "";
+    assert.match(errorMessage, /could not be read reliably/);
+    assert.match(errorMessage, /case-reupload-1/);
+  }
+  assert.equal(harness.transitions.length, 0);
+  assert.equal(harness.persistedIntakeResults.length, 0);
+  assert.deepEqual(harness.createdCases, [
+    {
+      workflowType: "EXPENSE_CLAIM",
+      requesterId: "demo.requester",
+    },
+  ]);
 });
 
 test("WorkflowOrchestratorService re-ingests intake and re-runs policy after a retry on a POLICY_REVIEW case", async () => {
