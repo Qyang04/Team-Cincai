@@ -11,6 +11,74 @@ type Mode = "approve" | "reject" | "send-back" | "assign";
 
 type Feedback = { kind: "success"; message: string } | { kind: "error"; message: string } | null;
 
+function FieldHint({ hint }: { hint: string }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <span
+      onMouseEnter={() => setIsOpen(true)}
+      onMouseLeave={() => setIsOpen(false)}
+      style={{
+        position: "relative",
+        display: "inline-flex",
+        alignItems: "center",
+        marginLeft: 6,
+      }}
+    >
+      <button
+        type="button"
+        className="field-hint-trigger"
+        aria-label="Show field hint"
+        aria-expanded={isOpen}
+        onFocus={() => setIsOpen(true)}
+        onBlur={() => setIsOpen(false)}
+        onClick={() => setIsOpen((current) => !current)}
+        style={{
+          width: 18,
+          height: 18,
+          borderRadius: "999px",
+          border: "1px solid var(--border-color, #c5ccd5)",
+          background: "var(--panel-muted, #f6f8fb)",
+          color: "var(--text-muted, #4b5563)",
+          fontSize: 12,
+          lineHeight: "16px",
+          fontWeight: 700,
+          cursor: "help",
+          padding: 0,
+        }}
+      >
+        i
+      </button>
+      <span
+        className="field-hint-popover"
+        role="tooltip"
+        style={{
+          position: "absolute",
+          left: 0,
+          top: "calc(100% + 6px)",
+          width: 260,
+          background: "var(--panel-bg, #ffffff)",
+          border: "1px solid var(--border-color, #d6dce3)",
+          borderRadius: 8,
+          boxShadow: "0 8px 24px rgba(15, 23, 42, 0.12)",
+          padding: "8px 10px",
+          fontSize: 12,
+          lineHeight: 1.45,
+          color: "var(--text-secondary, #1f2937)",
+          zIndex: 20,
+          opacity: isOpen ? 1 : 0,
+          visibility: isOpen ? "visible" : "hidden",
+          transform: isOpen ? "translateY(0)" : "translateY(-2px)",
+          transition: "opacity 120ms ease, transform 120ms ease, visibility 120ms ease",
+          pointerEvents: isOpen ? "auto" : "none",
+        }}
+      >
+        {hint}
+      </span>
+    </span>
+  );
+}
+
 export function FinanceReviewActionForm({ reviewId }: { reviewId: string }) {
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [pendingMode, setPendingMode] = useState<Mode | null>(null);
@@ -105,12 +173,18 @@ export function FinanceReviewActionForm({ reviewId }: { reviewId: string }) {
       style={{ marginTop: 12 }}
     >
       <label className="field">
-        <span className="field-label">Owner (work assignment)</span>
+        <span className="field-label">
+          Owner (work assignment)
+          <FieldHint hint="Choose who should actively handle this review item." />
+        </span>
         <input name="ownerId" placeholder="Assign to finance reviewer ID" className="field-control" suppressHydrationWarning />
       </label>
 
       <label className="field">
-        <span className="field-label">Reason category</span>
+        <span className="field-label">
+          Reason category
+          <FieldHint hint="Pick the main reason this case needs finance review: Policy block, Reconciliation, Coding, Risk, Missing support, or Other." />
+        </span>
         <select name="reasonCategory" className="field-control" defaultValue="">
           <option value="">Select category</option>
           <option value="POLICY_BLOCK">Policy block</option>
@@ -123,7 +197,10 @@ export function FinanceReviewActionForm({ reviewId }: { reviewId: string }) {
       </label>
 
       <label className="field">
-        <span className="field-label">Coding decision</span>
+        <span className="field-label">
+          Coding decision
+          <FieldHint hint="Record how this should be handled: Approve as-is, Reclassify, Split entry, or Hold." />
+        </span>
         <select name="codingDecision" className="field-control" defaultValue="">
           <option value="">No coding decision</option>
           <option value="APPROVE_AS_IS">Approve as-is</option>
@@ -135,7 +212,10 @@ export function FinanceReviewActionForm({ reviewId }: { reviewId: string }) {
 
       <div className="field-grid">
         <label className="field">
-          <span className="field-label">Reconciliation status</span>
+          <span className="field-label">
+            Reconciliation status
+            <FieldHint hint="Matched means figures align, Adjusted means you corrected the amount, Unresolved means it still does not tie out." />
+          </span>
           <select name="reconciliationStatus" className="field-control" defaultValue="">
             <option value="">No reconciliation decision</option>
             <option value="MATCHED">Matched</option>
@@ -144,18 +224,27 @@ export function FinanceReviewActionForm({ reviewId }: { reviewId: string }) {
           </select>
         </label>
         <label className="field">
-          <span className="field-label">Reconciled amount</span>
+          <span className="field-label">
+            Reconciled amount
+            <FieldHint hint="Enter the final confirmed amount after reconciliation, especially if status is Adjusted." />
+          </span>
           <input name="reconciledAmount" type="number" step="0.01" min={0} className="field-control" />
         </label>
       </div>
 
       <label className="field">
-        <span className="field-label">Reconciled currency</span>
+        <span className="field-label">
+          Reconciled currency
+          <FieldHint hint="Currency code for the reconciled amount, for example MYR." />
+        </span>
         <input name="reconciledCurrency" placeholder="MYR" className="field-control" />
       </label>
 
       <label className="field">
-        <span className="field-label">Finance annotation</span>
+        <span className="field-label">
+          Finance annotation
+          <FieldHint hint="Internal finance context: what you reviewed, key evidence, and concerns for follow-up." />
+        </span>
         <textarea
           name="annotation"
           rows={2}
@@ -166,7 +255,10 @@ export function FinanceReviewActionForm({ reviewId }: { reviewId: string }) {
       </label>
 
       <label className="field">
-        <span className="field-label">Review note</span>
+        <span className="field-label">
+          Review note
+          <FieldHint hint="Write a clear decision explanation. Required when sending back so requester knows what to provide." />
+        </span>
         <textarea
           name="note"
           rows={3}
