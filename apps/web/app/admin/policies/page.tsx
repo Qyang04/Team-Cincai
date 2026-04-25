@@ -149,8 +149,7 @@ export default async function AdminPoliciesPage() {
             <div className="notice">
               <strong>Live admin settings could not be loaded.</strong>
               <p className="muted">
-                The form below is showing local fallback values because the policy or routing endpoint is unavailable at{" "}
-                <code>{apiBaseUrl}</code>.
+                The form below is showing fallback values because some settings are temporarily unavailable.
               </p>
               {data.errors.length ? (
                 <p className="muted">{data.errors.join(" ")}</p>
@@ -195,7 +194,7 @@ export default async function AdminPoliciesPage() {
                   </div>
                 </div>
                 <p className="muted">
-                  Start the API and enable the connector status endpoint to inspect real integration readiness here.
+                  Connector status is temporarily unavailable. Please check again later.
                 </p>
               </article>
             )}

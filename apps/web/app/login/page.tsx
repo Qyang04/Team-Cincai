@@ -66,7 +66,7 @@ export default function LoginPage() {
       try {
         const response = await fetch(`${apiBaseUrl}/auth/demo-users`, { cache: "no-store" });
         if (!response.ok) {
-          throw new Error(`Unable to load demo users (${response.status}).`);
+          throw new Error("Unable to load demo users. Please try again.");
         }
         const payload = directoryUserListResponseSchema.parse(await response.json());
         if (active) {
@@ -94,7 +94,7 @@ export default function LoginPage() {
           body: JSON.stringify({ userId }),
         });
         if (!response.ok) {
-          throw new Error(`Sign-in failed (${response.status}).`);
+          throw new Error("Sign-in failed. Please try again.");
         }
         const payload = authTokenResponseSchema.parse(await response.json());
         setClientAccessToken(payload.accessToken);
@@ -119,8 +119,7 @@ export default function LoginPage() {
           <span className="kicker">Sign in</span>
           <h1>Choose a demo identity to enter the workflow control plane.</h1>
           <p>
-            This demo uses backend-issued JWT sessions backed by the seeded user directory, so each lane sees only the
-            cases and queues allowed by its role.
+            Choose a role to explore the workflow. Each role only sees the queues and actions relevant to that role.
           </p>
           {error ? <p className="text-danger">{error}</p> : null}
         </div>

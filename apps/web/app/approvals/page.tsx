@@ -248,9 +248,7 @@ export default async function ApprovalsPage() {
       {errorMessage ? (
         <div className="notice">
           <strong>Approval queue failed to load.</strong>
-          <p className="muted">
-            {errorMessage} Expected API base URL: <code>{apiBaseUrl}</code>.
-          </p>
+          <p className="muted">{errorMessage}</p>
         </div>
       ) : null}
 
@@ -457,7 +455,7 @@ export default async function ApprovalsPage() {
               <p className="muted">
                 {errorMessage
                   ? errorMessage
-                  : `If you expected a task, confirm the API is running at ${apiBaseUrl} and that policy routed the case to AWAITING_APPROVAL.`}
+                  : "If you expected a task, it may still be processing. Please refresh shortly."}
               </p>
             </div>
           </article>

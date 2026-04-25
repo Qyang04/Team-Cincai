@@ -27,7 +27,7 @@ export default function NewCasePage() {
               <p className="eyebrow">Intake form</p>
               <h2>Submit request</h2>
             </div>
-            <span className="inline-status">Backed by live API</span>
+            <span className="inline-status">Live data enabled</span>
           </div>
           <CaseForm />
         </article>

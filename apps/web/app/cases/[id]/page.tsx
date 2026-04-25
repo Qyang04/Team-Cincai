@@ -115,10 +115,10 @@ export default async function CaseDetailPage({ params }: CaseDetailPageProps) {
           <h2>{isMissing ? "Case not found" : "Case detail failed to load"}</h2>
           <p className="muted">
             {errorMessage ??
-              "The API could not return this case. Start the backend and submit a case from the intake form to populate live detail data."}
+              "We could not load this case right now. Please refresh or return to your case list."}
           </p>
           <p className="muted">
-            Looked for <code>{id}</code> at <code>{apiBaseUrl}</code>.
+            Case ID: <code>{id}</code>.
           </p>
           <Link className="button-primary" href="/cases/new">
             Start a new case

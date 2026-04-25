@@ -109,7 +109,7 @@ export default async function DashboardPage() {
           label: "Live summary",
           value: "Unavailable",
           tone: "metric-critical",
-          note: `Start the API at ${apiBaseUrl} to load dashboard data.`,
+          note: "We could not load dashboard data right now. Please try again shortly.",
         },
         { label: "Approval lane", value: "Route ready", tone: "metric-neutral", note: "Use the approvals page for action controls." },
         { label: "Finance lane", value: "Route ready", tone: "metric-neutral", note: "Use finance review for escalated cases." },
@@ -121,9 +121,7 @@ export default async function DashboardPage() {
       {!isLive && errorMessage ? (
         <div className="notice">
           <strong>Dashboard data failed to load.</strong>
-          <p className="muted">
-            {errorMessage} Expected API base URL: <code>{apiBaseUrl}</code>.
-          </p>
+          <p className="muted">{errorMessage}</p>
         </div>
       ) : null}
 
@@ -144,7 +142,7 @@ export default async function DashboardPage() {
         </div>
         <div className="split-actions">
           <span className={`inline-status${isLive ? " inline-status-success" : ""}`}>
-            {isLive ? "Live data" : "API unavailable"}
+            {isLive ? "Up to date" : "Data temporarily unavailable"}
           </span>
           <Link className="button-secondary" href="/cases/new">
             New case
@@ -173,7 +171,7 @@ export default async function DashboardPage() {
         <p className="section-copy">
           {isLive
             ? `There are ${awaitingRequesterInfo} case${awaitingRequesterInfo === 1 ? "" : "s"} awaiting requester information, ${awaitingApproval} in approval, ${financeReview} in finance review, and ${exportReady} marked export-ready.`
-            : "Case summaries appear here after the dashboard can reach the API."}
+            : "Case summaries appear here once data is available again."}
         </p>
         <div className="hero-actions">
           <Link className="button-primary" href="/approvals">
@@ -387,7 +385,7 @@ export default async function DashboardPage() {
                 <p className="muted">
                   {isLive
                     ? "Submit a case from the requester flow, then return here to review live workflow states."
-                    : `Start the API at ${apiBaseUrl} to load recent cases on this dashboard.`}
+                    : "We could not load recent cases right now. Please try again shortly."}
                 </p>
               </div>
             </div>

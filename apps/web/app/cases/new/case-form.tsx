@@ -372,8 +372,8 @@ export function CaseForm() {
             <div className="dropzone-icon">AI</div>
             <strong>Stage the evidence for this request</strong>
             <p className="muted">
-              Click, drag and drop, or paste (Ctrl+V) real files. Each file is uploaded to the API and stored under{" "}
-              <code>.local-artifacts/</code> on the server (see <code>LOCAL_ARTIFACT_DIR</code>).
+              Click, drag and drop, or paste (Ctrl+V) real files. Your files will be securely uploaded and attached to
+              this case.
             </p>
           </div>
           <input
@@ -397,7 +397,7 @@ export function CaseForm() {
           <div className="stack-list" style={{ gap: 8 }}>
             <p className="detail-label">Staged files (full upload on submit)</p>
             <p className="muted" style={{ margin: 0, fontSize: "0.9rem" }}>
-              Submit sends each file&apos;s bytes to the API where they are stored on disk and OCR-processed before AI intake.
+              When you submit, we process your files and extract the key details automatically.
             </p>
             <div className="split-actions" style={{ flexWrap: "wrap", gap: 8, justifyContent: "flex-start" }}>
               {stagedFiles.map((file) => (
@@ -494,9 +494,7 @@ export function CaseForm() {
         <div className="notice notice-error">
           <strong>Submission failed</strong>
           <p className="muted">{state.error}</p>
-          <p className="muted">
-            Confirm the API is running at <code>{apiBaseUrl}</code> and try again.
-          </p>
+          <p className="muted">Please try again in a moment.</p>
         </div>
       ) : null}
     </form>

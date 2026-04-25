@@ -21,14 +21,6 @@ type FetchApiJsonOptions<T> = {
   parse?: (value: unknown) => T;
 };
 
-function describeError(error: unknown): string {
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-
-  return "Unexpected request failure.";
-}
-
 export async function fetchApiJson<T>({
   url,
   init,
@@ -44,7 +36,7 @@ export async function fetchApiJson<T>({
         ok: false,
         data: fallbackData,
         status: response.status,
-        message: `${resourceLabel} request failed with ${response.status} ${response.statusText}.`,
+        message: `${resourceLabel} is temporarily unavailable. Please try again.`,
       };
     }
 
@@ -55,11 +47,11 @@ export async function fetchApiJson<T>({
       data: parse ? parse(payload) : (payload as T),
       status: response.status,
     };
-  } catch (error) {
+  } catch {
     return {
       ok: false,
       data: fallbackData,
-      message: `${resourceLabel} could not be reached. ${describeError(error)}`,
+      message: `${resourceLabel} is temporarily unavailable. Please try again.`,
     };
   }
 }

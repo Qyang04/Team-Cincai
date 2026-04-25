@@ -62,9 +62,7 @@ export default async function FinanceReviewPage() {
       {errorMessage ? (
         <div className="notice">
           <strong>Finance review queue failed to load.</strong>
-          <p className="muted">
-            {errorMessage} Expected API base URL: <code>{apiBaseUrl}</code>.
-          </p>
+          <p className="muted">{errorMessage}</p>
         </div>
       ) : null}
 
@@ -208,7 +206,7 @@ export default async function FinanceReviewPage() {
               <p className="muted">
                 {errorMessage
                   ? errorMessage
-                  : `If you expected a case, confirm the API is running at ${apiBaseUrl} and that policy routed it to FINANCE_REVIEW.`}
+                  : "If you expected a case, it may still be processing. Please check again soon."}
               </p>
             </div>
           </article>
