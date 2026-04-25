@@ -156,7 +156,7 @@ export class ZaiAiProviderService {
   private readonly client = process.env.ZAI_API_KEY
     ? new OpenAI({
         apiKey: process.env.ZAI_API_KEY,
-        baseURL: process.env.ZAI_BASE_URL ?? "https://api.z.ai/api/paas/v4",
+        baseURL: process.env.ZAI_BASE_URL ?? "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
       })
     : null;
 
@@ -166,12 +166,12 @@ export class ZaiAiProviderService {
   }> {
     if (!this.client) {
       throw new Error(
-        "Z.AI client is not configured. Set ZAI_API_KEY (and optionally ZAI_BASE_URL / ZAI_MODEL_PRIMARY) — there is no mock fallback.",
+        "AI client is not configured. Set ZAI_API_KEY (and optionally ZAI_BASE_URL / ZAI_MODEL_PRIMARY) — there is no mock fallback.",
       );
     }
 
     const response = await this.client.chat.completions.create({
-      model: process.env.ZAI_MODEL_PRIMARY ?? "glm-5.1",
+      model: process.env.ZAI_MODEL_PRIMARY ?? "qwen3.5-plus",
       temperature: 0.1,
       messages: [
         {
@@ -202,7 +202,7 @@ export class ZaiAiProviderService {
 
     const raw = response.choices[0]?.message?.content;
     if (!raw) {
-      throw new Error("Z.AI returned no content.");
+      throw new Error("AI provider returned no content.");
     }
 
     return normalizeParsedResult(JSON.parse(extractJsonObject(raw)) as Record<string, unknown>);

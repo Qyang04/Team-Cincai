@@ -1,56 +1,79 @@
 # SME Finance Ops Copilot
 
-Greenfield implementation scaffold for a finance-operations workflow platform powered by Z.AI GLM.
+> [!IMPORTANT]
+> **🚀 [View the Project Presentation on Canva](https://canva.link/5490yir8jsymb0s)**
+> 
+> **📂 [Backup Documentation & Video (Google Drive)](https://drive.google.com/drive/folders/1LVr58U6C5wv-CDQNNJRFhnQQYLTkrFwO?usp=sharing)**
 
-## Stack
-- Next.js web app
-- NestJS API
-- PostgreSQL + Prisma
-- Redis + BullMQ
-- Supabase Auth/Storage
-- Z.AI GLM via backend gateway
+Greenfield implementation scaffold for a finance-operations workflow platform powered by **Qwen AI**.
 
-## Workspace Layout
-- `apps/web`: requester, approver, finance-review, and admin UI
-- `apps/api`: workflow engine, AI orchestration, policy engine, approval flow
-- `packages/shared`: shared domain types, schemas, and workflow constants
+## 🚀 Getting Started
 
-## Backend Runtime Notes
-- `apps/api/README.md`: current backend handoff, known-safe endpoints, mock-auth headers, and demo verification scenarios
+Follow these steps to get the project running locally.
 
-## Next Steps
-1. Install dependencies with `npm.cmd install`
-2. Start local services with `docker compose up -d`
-3. Apply the current Prisma schema to your local database:
+### 1. Prerequisites
+- **Node.js** (v18 or higher)
+- **Docker & Docker Desktop** (for PostgreSQL and Redis)
+- **Alibaba Cloud API Key** (for Qwen AI)
+
+### 2. Setup Environment
+1. Clone the repository.
+2. Copy `.env.example` to `.env` in the root directory:
+   ```powershell
+   cp .env.example .env
+   ```
+3. Update `.env` with your **Qwen API Key** and settings:
+   ```bash
+   ZAI_API_KEY=your_key_here
+   ZAI_BASE_URL=https://dashscope-intl.aliyuncs.com/compatible-mode/v1
+   ZAI_MODEL_PRIMARY=qwen3.5-plus
+   ```
+
+### 3. Install & Start Services
+Run these commands in order:
+
+1. **Install dependencies:**
+   ```powershell
+   npm install
+   ```
+2. **Start Docker services (Database & Redis):**
+   ```powershell
+   docker-compose up -d
+   ```
+3. **Generate Prisma Client:**
+   ```powershell
+   npx prisma generate --schema apps/api/prisma/schema.prisma
+   ```
+4. **Push Database Schema:**
+   ```powershell
+   npx prisma db push --schema apps/api/prisma/schema.prisma
+   ```
+
+### 4. Run the Application
+You need to start both the API and the Web App.
+
+**Start the NestJS API:**
 ```powershell
-npx prisma db push --schema apps/api/prisma/schema.prisma
-```
-4. Implement real auth/storage and queue wiring
-5. Replace mock connectors with production integrations over time
-
-## Run The API
-Before starting the API for the first time, make sure your database schema has been pushed:
-```powershell
-npx prisma db push --schema apps/api/prisma/schema.prisma
+npm run dev:api
 ```
 
-Then start the NestJS API:
+**Start the Next.js Web App (in a new terminal):**
 ```powershell
-npm.cmd run dev:api
+npm run dev:web
 ```
 
-## Run The Web App
-1. Start the API if you want the web app to load live data. The web app uses `http://localhost:4000/api` by default:
-```powershell
-npm.cmd run dev:api
-```
-2. In a separate terminal, start the Next.js app:
-```powershell
-npm.cmd run dev:web
-```
-4. Open `http://localhost:3000` in your browser.
-If your API is running on a different host or port, set `NEXT_PUBLIC_API_BASE_URL` before starting the web app.
-```powershell
-$env:NEXT_PUBLIC_API_BASE_URL="http://localhost:4000/api"
-npm.cmd run dev:web
-```
+Open [http://localhost:3000](http://localhost:3000) to view the application.
+
+---
+
+## 🏗️ Workspace Layout
+- `apps/web`: Next.js frontend (Requester, Approver, Finance-Review, Admin UI)
+- `apps/api`: NestJS backend (Workflow engine, AI orchestration, Policy engine)
+- `packages/shared`: Shared domain types, Zod schemas, and constants
+
+## 🛠️ Stack
+- **Web:** Next.js 15, Tailwind CSS, Lucide Icons
+- **API:** NestJS, OpenAI SDK (connected to Qwen)
+- **Database:** PostgreSQL (via Prisma)
+- **Messaging:** Redis + BullMQ
+- **Auth/Storage:** Supabase (with Mock Fallback)
