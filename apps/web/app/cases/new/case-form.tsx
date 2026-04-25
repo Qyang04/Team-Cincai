@@ -10,6 +10,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition, type ClipboardEvent, type DragEvent } from "react";
+import { createPortal } from "react-dom";
 import { getApiBaseUrl, getClientAuthHeaders } from "../../lib/client-session";
 
 const workflowOptions: ReadonlyArray<{ value: WorkflowType; label: string }> = [
@@ -61,6 +62,9 @@ export function CaseForm() {
   const [notes, setNotes] = useState("Please reimburse Sarah for client lunch and parking from yesterday.");
   const [stagedFiles, setStagedFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [showErrorDialog, setShowErrorDialog] = useState(false);
+  const [hasMounted, setHasMounted] = useState(false);
   const [isPending, startTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const dropzoneRef = useRef<HTMLDivElement | null>(null);
@@ -70,12 +74,23 @@ export function CaseForm() {
     state.kind === "error" && isReuploadRequiredErrorMessage(state.error);
 
   useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  useEffect(() => {
     if (!requiresFreshUpload) {
       return;
     }
+    setShowUploadDialog(true);
     dropzoneRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
     fileInputRef.current?.focus();
   }, [requiresFreshUpload]);
+
+  useEffect(() => {
+    if (state.kind === "error") {
+      setShowErrorDialog(true);
+    }
+  }, [state]);
 
   function addStagedFiles(files: File[]) {
     if (!files.length) return;
@@ -212,6 +227,117 @@ export function CaseForm() {
 
   return (
     <form action={handleSubmit} className="form-grid">
+      {hasMounted && showUploadDialog
+        ? createPortal(
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="File needs re-upload"
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(15, 23, 42, 0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            padding: 16,
+          }}
+        >
+          <div
+            className="surface"
+            style={{
+              width: "min(560px, 100%)",
+              border: "1px solid #fecaca",
+              boxShadow: "0 12px 40px rgba(15, 23, 42, 0.22)",
+              minHeight: "auto",
+              height: "auto",
+            }}
+          >
+            <p className="eyebrow">Upload required</p>
+            <h3 style={{ marginTop: 0 }}>File could not be read clearly</h3>
+            <p className="muted">
+              This submission is blocked because at least one file could not be extracted reliably. Please upload a
+              clearer file before trying again.
+            </p>
+            <div className="split-actions" style={{ marginTop: 12 }}>
+              <button
+                type="button"
+                className="button-primary"
+                onClick={() => {
+                  setShowUploadDialog(false);
+                  fileInputRef.current?.click();
+                }}
+              >
+                Choose clearer file
+              </button>
+              <button
+                type="button"
+                className="button-secondary"
+                onClick={() => setShowUploadDialog(false)}
+              >
+                I will do this now
+              </button>
+            </div>
+          </div>
+        </div>,
+            document.body,
+          )
+        : null}
+      {hasMounted && showErrorDialog && state.kind === "error"
+        ? createPortal(
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Submission error"
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(15, 23, 42, 0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1001,
+            padding: 16,
+          }}
+        >
+          <div
+            className="surface"
+            style={{
+              width: "min(520px, 100%)",
+              border: "1px solid #fecaca",
+              boxShadow: "0 12px 40px rgba(15, 23, 42, 0.22)",
+              minHeight: "auto",
+              height: "auto",
+            }}
+          >
+            <p className="eyebrow">Submission failed</p>
+            <h3 style={{ marginTop: 0 }}>
+              {requiresFreshUpload ? "We couldn't read your file clearly" : "Unable to submit case"}
+            </h3>
+            {requiresFreshUpload ? (
+              <div className="stack-list" style={{ gap: 10 }}>
+                <p className="muted" style={{ margin: 0 }}>
+                  No worries - your case details are still here. Please upload a clearer image/file, then submit again.
+                </p>
+              </div>
+            ) : (
+              <p className="muted">{state.error}</p>
+            )}
+            <div className="split-actions" style={{ marginTop: 12 }}>
+              <button
+                type="button"
+                className="button-primary"
+                onClick={() => setShowErrorDialog(false)}
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>,
+            document.body,
+          )
+        : null}
       <div className="stack-list">
         <div
           ref={dropzoneRef}

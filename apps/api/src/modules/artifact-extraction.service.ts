@@ -42,6 +42,31 @@ function normalizeInlineText(value: string): string {
   return value.replace(/\u0000/g, "").trim();
 }
 
+function isLikelyUnreadableOcrText(value: string): boolean {
+  const normalized = normalizeInlineText(value);
+  if (!normalized) {
+    return true;
+  }
+
+  const alnumCount = (normalized.match(/[a-z0-9]/gi) ?? []).length;
+  if (alnumCount < 8) {
+    return true;
+  }
+
+  const alnumRatio = alnumCount / normalized.length;
+  if (alnumRatio < 0.35) {
+    return true;
+  }
+
+  const hasAmountHint = /\b\d{1,4}(?:[.,]\d{2})?\b|rm|myr|usd|\$/i.test(normalized);
+  const hasReceiptHint = /receipt|invoice|total|amount|merchant|vendor|date|tax|parking|lunch/i.test(normalized);
+  if (!hasAmountHint && !hasReceiptHint && alnumCount < 24) {
+    return true;
+  }
+
+  return false;
+}
+
 @Injectable()
 export class ArtifactExtractionService {
   constructor(
@@ -183,6 +208,8 @@ export class ArtifactExtractionService {
       const extractedText = await this.documentOcrService.extractJoinedText([buffer]);
       if (!extractedText) {
         warnings.push("OCR did not detect text in the uploaded image.");
+      } else if (isLikelyUnreadableOcrText(extractedText)) {
+        warnings.push("OCR output appears low quality or unreadable; please upload a clearer image.");
       }
       return {
         extractedText,
