@@ -42,6 +42,57 @@ function normalizeInlineText(value: string): string {
   return value.replace(/\u0000/g, "").trim();
 }
 
+type FinanceDocumentSignal = {
+  allowed: boolean;
+  matchedKeywords: string[];
+  alnumCount: number;
+};
+
+const FINANCE_DOCUMENT_KEYWORDS = [
+  "receipt",
+  "invoice",
+  "bill",
+  "tax invoice",
+  "payment request",
+  "reimbursement",
+  "merchant",
+  "vendor",
+  "subtotal",
+  "total",
+  "amount",
+  "tax",
+  "vat",
+  "sst",
+  "service charge",
+  "project code",
+  "cost center",
+  "reference no",
+  "invoice no",
+  "invoice number",
+  "date",
+  "payee",
+] as const;
+
+const CURRENCY_OR_AMOUNT_PATTERN = /\b(?:rm|myr|usd|sgd|eur|gbp|idr|thb|¥|€|\$)\b|\b\d{1,4}(?:[.,]\d{2})\b/i;
+
+function collectFinanceKeywordMatches(value: string): string[] {
+  const lower = value.toLowerCase();
+  return FINANCE_DOCUMENT_KEYWORDS.filter((keyword) => lower.includes(keyword));
+}
+
+function evaluateFinanceDocumentSignal(input: { filename: string; extractedText: string }): FinanceDocumentSignal {
+  const normalizedText = normalizeInlineText(input.extractedText).toLowerCase();
+  const normalizedFilename = input.filename.toLowerCase();
+  const combined = `${normalizedFilename}\n${normalizedText}`;
+  const matchedKeywords = collectFinanceKeywordMatches(combined);
+  const alnumCount = (combined.match(/[a-z0-9]/gi) ?? []).length;
+  const hasCurrencyOrAmount = CURRENCY_OR_AMOUNT_PATTERN.test(combined);
+  const strongKeywordSignal = matchedKeywords.length >= 2;
+  const minimalDocumentShape = alnumCount >= 14;
+  const allowed = (strongKeywordSignal && minimalDocumentShape) || (matchedKeywords.length >= 1 && hasCurrencyOrAmount);
+  return { allowed, matchedKeywords, alnumCount };
+}
+
 function isLikelyUnreadableOcrText(value: string): boolean {
   const normalized = normalizeInlineText(value);
   if (!normalized) {
@@ -172,6 +223,13 @@ export class ArtifactExtractionService {
 
     if (isTextLike(artifact.filename, mimeType)) {
       const extractedText = normalizeInlineText(buffer.toString("utf8").slice(0, 24_000));
+      const documentSignal = evaluateFinanceDocumentSignal({
+        filename: artifact.filename,
+        extractedText,
+      });
+      if (!documentSignal.allowed) {
+        warnings.push("Uploaded file does not look like a supported finance document (receipt/invoice/payment proof).");
+      }
       return {
         extractedText,
         checksum,
@@ -179,6 +237,9 @@ export class ArtifactExtractionService {
         metadata: {
           extractionMethod: "TEXT_READ",
           extractionWarnings: warnings,
+          documentGateAllowed: documentSignal.allowed,
+          documentGateMatchedKeywords: documentSignal.matchedKeywords,
+          documentGateAlnumCount: documentSignal.alnumCount,
           hasLocalFile: true,
           byteLength: buffer.byteLength,
           mimeType: mimeType ?? null,
@@ -192,6 +253,13 @@ export class ArtifactExtractionService {
       if (!extractedText) {
         warnings.push("PDF had no embedded text. Scanned PDF OCR is not enabled in this workflow yet.");
       }
+      const documentSignal = evaluateFinanceDocumentSignal({
+        filename: artifact.filename,
+        extractedText,
+      });
+      if (!documentSignal.allowed) {
+        warnings.push("PDF content does not look like a supported finance document (receipt/invoice/payment proof).");
+      }
       return {
         extractedText,
         checksum,
@@ -199,6 +267,9 @@ export class ArtifactExtractionService {
         metadata: {
           extractionMethod: extractedText ? "PDF_TEXT" : "PDF_TEXT_EMPTY",
           extractionWarnings: warnings,
+          documentGateAllowed: documentSignal.allowed,
+          documentGateMatchedKeywords: documentSignal.matchedKeywords,
+          documentGateAlnumCount: documentSignal.alnumCount,
           hasLocalFile: true,
           byteLength: buffer.byteLength,
           mimeType: mimeType ?? null,
@@ -214,6 +285,13 @@ export class ArtifactExtractionService {
       } else if (isLikelyUnreadableOcrText(extractedText)) {
         warnings.push("OCR output appears low quality or unreadable; please upload a clearer image.");
       }
+      const documentSignal = evaluateFinanceDocumentSignal({
+        filename: artifact.filename,
+        extractedText,
+      });
+      if (!documentSignal.allowed) {
+        warnings.push("Image content does not look like a supported finance document (receipt/invoice/payment proof).");
+      }
       return {
         extractedText,
         checksum,
@@ -221,6 +299,9 @@ export class ArtifactExtractionService {
         metadata: {
           extractionMethod: "OCR_IMAGE",
           extractionWarnings: warnings,
+          documentGateAllowed: documentSignal.allowed,
+          documentGateMatchedKeywords: documentSignal.matchedKeywords,
+          documentGateAlnumCount: documentSignal.alnumCount,
           hasLocalFile: true,
           byteLength: buffer.byteLength,
           mimeType: mimeType ?? null,
